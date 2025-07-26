@@ -10,7 +10,8 @@
         "@inertiajs/vue3": "^2.0.0",
         "@tailwindcss/forms": "^0.5.3",
         "@tailwindcss/vite": "^4.0.0",
-        "@vitejs/plugin-vue": "^5.0.0",
+        "@tanstack/vue-query": "^5.83.0",
+        "@vitejs/plugin-vue": "^6.0.0",
         "autoprefixer": "^10.4.12",
         "axios": "^1.8.2",
         "concurrently": "^9.0.1",
@@ -18,8 +19,26 @@
         "postcss": "^8.4.31",
         "tailwindcss": "^3.2.1",
         "typescript": "^5.6.3",
-        "vite": "^7.0.4",
+        "vite": "^7.0.6",
         "vue": "^3.4.0",
         "vue-tsc": "^2.0.24"
+    },
+    "dependencies": {
+        "@unovis/ts": "^1.5.2",
+        "@unovis/vue": "^1.5.2",
+        "@vee-validate/zod": "^4.15.1",
+        "@vueuse/core": "^13.5.0",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "embla-carousel-vue": "^8.6.0",
+        "lucide-vue-next": "^0.525.0",
+        "reka-ui": "^2.4.0",
+        "tailwind-merge": "^3.3.1",
+        "tailwindcss-animate": "^1.0.7",
+        "vaul-vue": "^0.4.1",
+        "vee-validate": "^4.15.1",
+        "vue-router": "^4.5.1",
+        "vue-sonner": "^2.0.2",
+        "zod": "^3.25.76"
     }
 }
