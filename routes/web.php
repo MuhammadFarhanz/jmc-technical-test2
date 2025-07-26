@@ -24,4 +24,23 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-require __DIR__.'/auth.php';
+Route::inertia('/manajemen-user', 'ManajemenUser');
+Route::inertia('/master-data/kategori', 'Kategori');
+Route::inertia('/master-data/sub-kategori', 'SubKategori');
+
+// Route::get('/manajemen-user', function () {
+//     return Inertia::render('ManajemenUser', [
+//         // props
+//     ]);
+// });
+// Route::get('/master-data/kategori', function () {
+//     return Inertia::render('Kategori', [
+//         // props
+//     ]);
+// });
+// Route::get('/master-data/sub-kategori', function () {
+//     return Inertia::render('SubKategori', [
+//         // props
+//     ]);
+// });
+require __DIR__ . '/auth.php';
