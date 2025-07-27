@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\ItemController;
+use App\Http\Controllers\KategoriController;
 use App\Http\Controllers\ProfileController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -22,25 +24,48 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Kategori CRUD
+    Route::get('/kategori', [KategoriController::class, 'index'])->name('kategori.index');
+    Route::post('/kategori', [KategoriController::class, 'store'])->name('kategori.store');
+    Route::get('/kategori/{id}', [KategoriController::class, 'show'])->name('kategori.show');
+    Route::put('/kategori/{id}', [KategoriController::class, 'update'])->name('kategori.update');
+    Route::delete('/kategori/{id}', [KategoriController::class, 'destroy'])->name('kategori.destroy');
+
+    // SubKategori CRUD
+    Route::get('/sub-kategori', [\App\Http\Controllers\SubKategoriController::class, 'index'])->name('subkategori.index');
+    Route::post('/sub-kategori', [\App\Http\Controllers\SubKategoriController::class, 'store'])->name('subkategori.store');
+    Route::get('/sub-kategori/{id}', [\App\Http\Controllers\SubKategoriController::class, 'show'])->name('subkategori.show');
+    Route::put('/sub-kategori/{id}', [\App\Http\Controllers\SubKategoriController::class, 'update'])->name('subkategori.update');
+    Route::delete('/sub-kategori/{id}', [\App\Http\Controllers\SubKategoriController::class, 'destroy'])->name('subkategori.destroy');
+
+    // User CRUD
+    Route::get('/users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
+    Route::post('/users', [\App\Http\Controllers\UserController::class, 'store'])->name('users.store');
+    Route::get('/users/{id}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show');
+    Route::put('/users/{id}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
+    Route::delete('/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
+
+    // Dokumen CRUD
+    Route::get('/dokumen', [\App\Http\Controllers\DokumenController::class, 'index'])->name('dokumen.index');
+    Route::post('/dokumen', [\App\Http\Controllers\DokumenController::class, 'store'])->name('dokumen.store');
+    Route::get('/dokumen/{id}', [\App\Http\Controllers\DokumenController::class, 'show'])->name('dokumen.show');
+    Route::put('/dokumen/{id}', [\App\Http\Controllers\DokumenController::class, 'update'])->name('dokumen.update');
+    Route::delete('/dokumen/{id}', [\App\Http\Controllers\DokumenController::class, 'destroy'])->name('dokumen.destroy');
+
+    // Item CRUD
+    Route::prefix('items')->group(function () {
+        Route::get('/', [ItemController::class, 'index'])->name('items.index');
+        Route::post('/', [ItemController::class, 'store'])->name('items.store');
+        Route::put('/{item}', [ItemController::class, 'update'])->name('items.update');
+        Route::delete('/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
+    });
 });
+
+
 
 Route::inertia('/manajemen-user', 'ManajemenUser');
 Route::inertia('/master-data/kategori', 'Kategori');
 Route::inertia('/master-data/sub-kategori', 'SubKategori');
 
-// Route::get('/manajemen-user', function () {
-//     return Inertia::render('ManajemenUser', [
-//         // props
-//     ]);
-// });
-// Route::get('/master-data/kategori', function () {
-//     return Inertia::render('Kategori', [
-//         // props
-//     ]);
-// });
-// Route::get('/master-data/sub-kategori', function () {
-//     return Inertia::render('SubKategori', [
-//         // props
-//     ]);
-// });
 require __DIR__ . '/auth.php';
