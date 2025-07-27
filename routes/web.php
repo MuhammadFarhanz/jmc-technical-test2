@@ -3,6 +3,7 @@
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\KategoriController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\UserController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -45,24 +46,15 @@ Route::middleware('auth')->group(function () {
     Route::get('/users/{id}', [\App\Http\Controllers\UserController::class, 'show'])->name('users.show');
     Route::put('/users/{id}', [\App\Http\Controllers\UserController::class, 'update'])->name('users.update');
     Route::delete('/users/{id}', [\App\Http\Controllers\UserController::class, 'destroy'])->name('users.destroy');
-
-    // Dokumen CRUD
-    Route::get('/dokumen', [\App\Http\Controllers\DokumenController::class, 'index'])->name('dokumen.index');
-    Route::post('/dokumen', [\App\Http\Controllers\DokumenController::class, 'store'])->name('dokumen.store');
-    Route::get('/dokumen/{id}', [\App\Http\Controllers\DokumenController::class, 'show'])->name('dokumen.show');
-    Route::put('/dokumen/{id}', [\App\Http\Controllers\DokumenController::class, 'update'])->name('dokumen.update');
-    Route::delete('/dokumen/{id}', [\App\Http\Controllers\DokumenController::class, 'destroy'])->name('dokumen.destroy');
+    
 
     // Item CRUD
-    Route::prefix('items')->group(function () {
-        Route::get('/', [ItemController::class, 'index'])->name('items.index');
-        Route::post('/', [ItemController::class, 'store'])->name('items.store');
-        Route::put('/{item}', [ItemController::class, 'update'])->name('items.update');
-        Route::delete('/{item}', [ItemController::class, 'destroy'])->name('items.destroy');
-    });
+    Route::post('/items', [ItemController::class, 'store'])->name('items.store');
+    Route::get('/items', [ItemController::class, 'index']);
 });
 
-
+Route::get('/user/current', [UserController::class, 'current'])->middleware('auth:sanctum');
+Route::get('/users/operators', [UserController::class, 'operators']);
 
 Route::inertia('/manajemen-user', 'ManajemenUser');
 Route::inertia('/master-data/kategori', 'Kategori');

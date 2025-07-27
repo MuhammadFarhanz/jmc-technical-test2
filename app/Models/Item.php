@@ -3,35 +3,40 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Item extends Model
 {
     protected $fillable = [
-        'dokumen_id',
-        'subkategori_id',
-        'nama_item',
-        'harga',
-        'kuantitas',
-        'satuan',
-        'total',
+        'user_id',
+        'kategori_id',
+        'sub_kategori_id',
+        'batas_harga',
+        'nomor_surat',
         'asal_barang',
-        'tanggal_kadaluarsa'
+        'lampiran_path',
+        'daftar_barang',
+        'total_item',
+        'total_harga'
     ];
 
     protected $casts = [
-        'harga' => 'decimal:2',
-        'total' => 'decimal:2',
-        'tanggal_kadaluarsa' => 'date:Y-m-d'
+        'daftar_barang' => 'array',
+        'batas_harga' => 'decimal:2',
+        'total_harga' => 'decimal:2'
     ];
 
-    public function dokumen(): BelongsTo
+    public function user()
     {
-        return $this->belongsTo(Dokumen::class);
+        return $this->belongsTo(User::class);
     }
 
-    public function subKategori(): BelongsTo
+    public function kategori()
     {
-        return $this->belongsTo(SubKategori::class, 'subkategori_id');
+        return $this->belongsTo(Kategori::class);
+    }
+
+    public function subKategori()
+    {
+        return $this->belongsTo(SubKategori::class);
     }
 }

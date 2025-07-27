@@ -6,6 +6,8 @@ import { resolvePageComponent } from "laravel-vite-plugin/inertia-helpers";
 import { createApp, DefineComponent, h } from "vue";
 import { ZiggyVue } from "../../vendor/tightenco/ziggy";
 import { QueryClient, VueQueryPlugin } from "@tanstack/vue-query";
+import { plugin, defaultConfig } from "@formkit/vue";
+import Toaster from "@/components/ui/toast/Toaster.vue";
 const appName = import.meta.env.VITE_APP_NAME || "Laravel";
 
 createInertiaApp({
@@ -16,7 +18,14 @@ createInertiaApp({
             import.meta.glob<DefineComponent>("./Pages/**/*.vue")
         ),
     setup({ el, App, props, plugin }) {
-        const queryClient = new QueryClient();
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: {
+                    refetchOnWindowFocus: false,
+                    staleTime: 5 * 60 * 1000, // 5 minutes
+                },
+            },
+        });
 
         const vueApp = createApp({
             render: () => h(App, props),
@@ -25,6 +34,9 @@ createInertiaApp({
         vueApp.use(plugin);
         vueApp.use(ZiggyVue);
         vueApp.use(VueQueryPlugin, { queryClient });
+
+        // Register Toaster globally
+        vueApp.component("Toaster", Toaster);
 
         vueApp.mount(el);
     },
