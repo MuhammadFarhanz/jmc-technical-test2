@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->id();
             $table->enum('role', ['Admin', 'Operator'])->default('Operator');
             $table->string('name');
-            $table->string('username', 100)->unique();
+            $table->string('username', 100)->unique()->nullable();
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
