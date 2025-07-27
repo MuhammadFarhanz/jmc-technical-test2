@@ -24,6 +24,8 @@
         "vue-tsc": "^2.0.24"
     },
     "dependencies": {
+        "@formkit/themes": "^1.6.9",
+        "@formkit/vue": "^1.6.9",
         "@unovis/ts": "^1.5.2",
         "@unovis/vue": "^1.5.2",
         "@vee-validate/zod": "^4.15.1",
