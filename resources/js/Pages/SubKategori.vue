@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,42 +26,75 @@ import {
 } from "lucide-vue-next";
 import AddSubKategori from "@/Components/Dialog/AddSubKategori.vue";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { useSubKategori } from "@/composables/useSubKategori";
+import { useKategori } from "@/composables/useKategori";
+import { useToast } from "@/components/ui/toast/use-toast";
+
+const { toast } = useToast();
 const search = ref("");
 const currentPage = ref(1);
-const rowsPerPage = 2;
+const rowsPerPage = 10;
+const showDialog = ref(false);
+const currentEditItem = ref(null);
 
-const data = ref([
-    {
-        no: 1,
-        kategori: "Perlengkapan Kantor",
-        subKategori: "Alat Tulis",
-        batasHarga: "500.000",
-    },
-    {
-        no: 2,
-        kategori: "Perlengkapan Kantor",
-        subKategori: "Perabotan",
-        batasHarga: "7.500.000",
-    },
-    {
-        no: 3,
-        kategori: "Makanan",
-        subKategori: "Cemilan",
-        batasHarga: "200.000",
-    },
-    {
-        no: 4,
-        kategori: "Elektronik",
-        subKategori: "Printer",
-        batasHarga: "3.000.000",
-    },
-]);
+// Fetch data
+const { subKategorisQuery, deleteSubKategori } = useSubKategori();
+const { kategoris, isLoading: isLoadingKategori } = useKategori();
 
+// Handle delete
+const handleDelete = async (id) => {
+    if (confirm("Apakah Anda yakin ingin menghapus sub kategori ini?")) {
+        try {
+            await deleteSubKategori.mutateAsync(id);
+            toast({
+                title: "Berhasil",
+                description: "Sub kategori berhasil dihapus",
+                variant: "default",
+            });
+        } catch (error) {
+            toast({
+                title: "Gagal",
+                description:
+                    error.response?.data?.message ||
+                    "Gagal menghapus sub kategori",
+                variant: "destructive",
+            });
+        }
+    }
+};
+
+// Handle edit
+const handleEdit = (item) => {
+    currentEditItem.value = {
+        id: item.id,
+        kategori_id: item.kategori_id,
+        nama_subkategori: item.nama_subkategori,
+        batas_harga: item.batas_harga,
+    };
+    showDialog.value = true;
+};
+
+const kategoriOptions = computed(() => {
+    return (
+        kategoris.value?.map((kategori) => ({
+            id: kategori.id,
+            name: kategori.nama_kategori, 
+        })) || []
+    );
+});
+
+// Computed properties
 const filteredData = computed(() => {
-    return data.value.filter(
+    if (!subKategorisQuery.data.value) return [];
+
+    return subKategorisQuery.data.value.filter(
         (item) =>
-            item.kategori.toLowerCase().includes(search.value.toLowerCase()) ||
-            item.subKategori.toLowerCase().includes(search.value.toLowerCase())
+            item.kategori.nama_kategori
+                .toLowerCase()
+                .includes(search.value.toLowerCase()) ||
+            item.nama_subkategori
+                .toLowerCase()
+                .includes(search.value.toLowerCase())
     );
 });
 
@@ -73,12 +106,19 @@ const pagedData = computed(() => {
 const totalPages = computed(() => {
     return Math.ceil(filteredData.value.length / rowsPerPage);
 });
+
+const handleSuccess = () => {
+    showDialog.value = false;
+    currentEditItem.value = null;
+    subKategorisQuery.refetch();
+};
 </script>
+
 <template>
     <AuthenticatedLayout>
         <div class="p-6 w-5/6">
             <!-- Breadcrumb -->
-            <p class="text-sm text-gray-500 mb-2">
+            <p class="text-sm text-muted-foreground mb-2">
                 HOME / MASTER DATA / SUB KATEGORI
             </p>
 
@@ -87,15 +127,20 @@ const totalPages = computed(() => {
 
             <!-- Header actions -->
             <div class="flex justify-between items-center mb-4">
-                <Dialog>
-                    <DialogTrigger>
-                        <Button variant="default" class="gap-2">
+                <Dialog v-model:open="showDialog">
+                    <DialogTrigger as-child>
+                        <Button class="gap-2">
                             <Plus class="h-4 w-4" />
                             Tambah Data
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
-                        <AddSubKategori />
+                    <DialogContent class="sm:max-w-[425px]">
+                        <AddSubKategori
+                            :kategori-options="kategoriOptions"
+                            :initial-data="currentEditItem"
+                            @success="handleSuccess"
+                            @cancel="showDialog = false"
+                        />
                     </DialogContent>
                 </Dialog>
                 <div class="relative">
@@ -110,8 +155,24 @@ const totalPages = computed(() => {
                 </div>
             </div>
 
+            <!-- Loading State -->
+            <div
+                v-if="subKategorisQuery.isLoading.value"
+                class="text-center py-4"
+            >
+                Memuat data...
+            </div>
+
+            <!-- Error State -->
+            <div
+                v-else-if="subKategorisQuery.isError.value"
+                class="text-center py-4 text-red-500"
+            >
+                Gagal memuat data sub kategori
+            </div>
+
             <!-- Table -->
-            <div class="rounded-md border shadow-sm">
+            <div v-else class="rounded-md border shadow-sm">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -123,28 +184,56 @@ const totalPages = computed(() => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="item in pagedData" :key="item.no">
-                            <TableCell>{{ item.no }}</TableCell>
+                        <TableRow
+                            v-for="(item, index) in pagedData"
+                            :key="item.id"
+                        >
+                            <TableCell>
+                                {{ index + 1 }}
+                            </TableCell>
                             <TableCell>
                                 <div class="flex gap-2 justify-center">
                                     <Pencil
-                                        class="h-4 w-4 text-blue-600 cursor-pointer"
+                                        class="h-4 w-4 text-blue-600 cursor-pointer hover:text-blue-800"
+                                        @click="handleEdit(item)"
                                     />
                                     <Trash2
-                                        class="h-4 w-4 text-red-600 cursor-pointer"
+                                        class="h-4 w-4 text-red-600 cursor-pointer hover:text-red-800"
+                                        @click="handleDelete(item.id)"
                                     />
                                 </div>
                             </TableCell>
-                            <TableCell>{{ item.kategori }}</TableCell>
-                            <TableCell>{{ item.subKategori }}</TableCell>
-                            <TableCell>{{ item.batasHarga }}</TableCell>
+                            <TableCell>{{
+                                item.kategori?.nama_kategori
+                            }}</TableCell>
+                            <TableCell>{{ item.nama_subkategori }}</TableCell>
+                            <TableCell>
+                                {{
+                                    item.batas_harga
+                                        ? new Intl.NumberFormat("id-ID").format(
+                                              item.batas_harga
+                                          )
+                                        : "-"
+                                }}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow v-if="pagedData.length === 0">
+                            <TableCell colspan="5" class="text-center py-4">
+                                Tidak ada data ditemukan
+                            </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
             </div>
 
             <!-- Pagination -->
-            <Pagination class="mt-4 justify-end">
+            <Pagination
+                v-if="
+                    !subKategorisQuery.isLoading.value &&
+                    !subKategorisQuery.isError.value
+                "
+                class="mt-4 justify-end"
+            >
                 <PaginationContent>
                     <PaginationItem>
                         <Button
@@ -177,5 +266,4 @@ const totalPages = computed(() => {
             </Pagination>
         </div>
     </AuthenticatedLayout>
-    <
 </template>

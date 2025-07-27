@@ -26,25 +26,55 @@ import {
 } from "lucide-vue-next";
 import AddKategori from "@/Components/Dialog/AddKategori.vue";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { useQuery, useMutation } from "@tanstack/vue-query";
+import axios from "axios";
 
 const search = ref("");
 const currentPage = ref(1);
-const rowsPerPage = 2;
+const rowsPerPage = 10;
 
-const data = ref([
-    { no: 1, kode: "PK", namaKategori: "Perlengkapan Kantor" },
-    { no: 2, kode: "FO", namaKategori: "Makanan" },
-    { no: 3, kode: "AT", namaKategori: "ATK" },
-    { no: 4, kode: "EL", namaKategori: "Elektronik" },
-]);
 
+const {
+    data: kategoriData,
+    isLoading,
+    isError,
+    refetch,
+} = useQuery({
+    queryKey: ["kategori"],
+    queryFn: async () => {
+        const { data } = await axios.get("/kategori");
+        return data;
+    },
+});
+
+// Handle delete mutation
+const { mutate: deleteKategori } = useMutation({
+    mutationFn: async (id) => {
+        await axios.delete(`/kategori/${id}`);
+    },
+    onSuccess: () => {
+        refetch(); // Refresh data after deletion
+    },
+});
+
+const handleDelete = (id) => {
+    if (confirm("Apakah Anda yakin ingin menghapus kategori ini?")) {
+        deleteKategori(id);
+    }
+};
+
+// Computed properties for filtering and pagination
 const filteredData = computed(() => {
-    return data.value.filter(
+    if (!kategoriData.value) return [];
+
+    return kategoriData.value.filter(
         (item) =>
-            item.namaKategori
+            item.nama_kategori
                 .toLowerCase()
                 .includes(search.value.toLowerCase()) ||
-            item.kode.toLowerCase().includes(search.value.toLowerCase())
+            item.kode_kategori
+                .toLowerCase()
+                .includes(search.value.toLowerCase())
     );
 });
 
@@ -62,6 +92,11 @@ function handlePageChange(newPage) {
 }
 
 const showDialog = ref(false);
+
+const handleSuccess = () => {
+    showDialog.value = false;
+    refetch(); 
+};
 </script>
 
 <template>
@@ -77,16 +112,15 @@ const showDialog = ref(false);
 
             <!-- Header actions -->
             <div class="flex justify-between items-center mb-4">
-                <Dialog>
-                    <DialogTrigger>
-                        <!-- Your button to open dialog -->
-                        <Button class="gap-2" @click="showDialog = true">
+                <Dialog v-model:open="showDialog">
+                    <DialogTrigger as-child>
+                        <Button class="gap-2">
                             <Plus class="h-4 w-4" />
                             Tambah Data
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
-                        <AddKategori />
+                        <AddKategori @success="handleSuccess" />
                     </DialogContent>
                 </Dialog>
                 <div class="relative">
@@ -101,8 +135,16 @@ const showDialog = ref(false);
                 </div>
             </div>
 
+            <!-- Loading State -->
+            <div v-if="isLoading" class="text-center py-4">Memuat data...</div>
+
+            <!-- Error State -->
+            <div v-else-if="isError" class="text-center py-4 text-red-500">
+                Gagal memuat data kategori
+            </div>
+
             <!-- Data Table -->
-            <div class="rounded-md border">
+            <div v-else class="rounded-md border">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -113,8 +155,11 @@ const showDialog = ref(false);
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="item in paginatedData" :key="item.no">
-                            <TableCell>{{ item.no }}</TableCell>
+                        <TableRow
+                            v-for="(item, index) in paginatedData"
+                            :key="item.id"
+                        >
+                            <TableCell>{{ index + 1 }}</TableCell>
                             <TableCell>
                                 <div class="flex gap-2">
                                     <Pencil
@@ -122,18 +167,24 @@ const showDialog = ref(false);
                                     />
                                     <Trash2
                                         class="h-4 w-4 text-red-600 cursor-pointer hover:text-red-800"
+                                        @click="handleDelete(item.id)"
                                     />
                                 </div>
                             </TableCell>
-                            <TableCell>{{ item.kode }}</TableCell>
-                            <TableCell>{{ item.namaKategori }}</TableCell>
+                            <TableCell>{{ item.kode_kategori }}</TableCell>
+                            <TableCell>{{ item.nama_kategori }}</TableCell>
+                        </TableRow>
+                        <TableRow v-if="paginatedData.length === 0">
+                            <TableCell colspan="4" class="text-center py-4">
+                                Tidak ada data ditemukan
+                            </TableCell>
                         </TableRow>
                     </TableBody>
                 </Table>
             </div>
 
             <!-- Pagination -->
-            <Pagination class="mt-4 justify-end">
+            <Pagination v-if="!isLoading && !isError" class="mt-4 justify-end">
                 <PaginationContent>
                     <PaginationItem>
                         <Button
