@@ -43,6 +43,8 @@ const rowsPerPage = 10;
 const { usersQuery, deleteUser } = useUser();
 
 const roleOptions = ["Admin", "Operator"];
+
+console.log(usersQuery?.data?.value);
 const filteredData = computed(() => {
     if (!usersQuery.data.value) return [];
 
