@@ -22,6 +22,10 @@ export function useSubKategori() {
     const subKategoriOptions = computed(() => {
         const items = subKategorisQuery.data?.value ?? [];
 
+        console.log(
+            "Sub Kategori Options:",
+            items.map((item) => typeof item)
+        );
         return items.map((subKategori) => ({
             id: subKategori.id,
             name: subKategori.nama_subkategori,

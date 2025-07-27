@@ -1,4 +1,3 @@
-// useUser.js
 import { useQuery, useMutation, useQueryClient } from "@tanstack/vue-query";
 import axios from "axios";
 
@@ -13,6 +12,15 @@ export function useUser() {
 
             return data;
         },
+    });
+
+    const { data: operatorOptions } = useQuery({
+        queryKey: ["operators"],
+        queryFn: async () => {
+            const { data } = await axios.get("/api/users/operators");
+            return data;
+        },
+        initialData: [],
     });
 
     // Create user
@@ -49,6 +57,7 @@ export function useUser() {
     });
 
     return {
+        operatorOptions,
         usersQuery,
         createUser,
         updateUser,

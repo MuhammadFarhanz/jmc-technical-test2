@@ -4,7 +4,7 @@ import axios from "axios";
 export function useKategori() {
     const queryClient = useQueryClient();
 
-    // Fetch all kategori with proper error handling
+    
     const {
         data: kategoris,
         isLoading,
