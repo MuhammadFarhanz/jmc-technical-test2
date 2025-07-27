@@ -32,100 +32,28 @@ import {
 } from "lucide-vue-next";
 import AddUserDialog from "../Dialog/AddUserDialog.vue";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { useUser } from "@/composables/useUser";
 
 const search = ref("");
 const selectedRole = ref("");
 const currentPage = ref(1);
 const rowsPerPage = 10;
 
-const users = ref([
-    {
-        no: 1,
-        username: "admin",
-        nama: "Administrator",
-        email: "admin@gmail.com",
-        role: "Admin",
-    },
-    {
-        no: 2,
-        username: "joko",
-        nama: "Joko Suyanto",
-        email: "jokos@gmail.com",
-        role: "Operator",
-    },
-    {
-        no: 3,
-        username: "sari",
-        nama: "Sari Dewi",
-        email: "sari@gmail.com",
-        role: "Operator",
-    },
-    {
-        no: 4,
-        username: "budi",
-        nama: "Budi Santoso",
-        email: "budi@gmail.com",
-        role: "Admin",
-    },
-    {
-        no: 5,
-        username: "lisa",
-        nama: "Lisa Mulyani",
-        email: "lisa@gmail.com",
-        role: "Operator",
-    },
-    {
-        no: 6,
-        username: "rehan",
-        nama: "Rehan Ali",
-        email: "rehan@gmail.com",
-        role: "Admin",
-    },
-    {
-        no: 7,
-        username: "dian",
-        nama: "Dian Setiawan",
-        email: "dian@gmail.com",
-        role: "Operator",
-    },
-    {
-        no: 8,
-        username: "yusuf",
-        nama: "Yusuf Hadi",
-        email: "yusuf@gmail.com",
-        role: "Admin",
-    },
-    {
-        no: 9,
-        username: "tina",
-        nama: "Tina Nurhaliza",
-        email: "tina@gmail.com",
-        role: "Operator",
-    },
-    {
-        no: 10,
-        username: "andi",
-        nama: "Andi Prasetyo",
-        email: "andi@gmail.com",
-        role: "Admin",
-    },
-    {
-        no: 11,
-        username: "rahma",
-        nama: "Rahma Ayu",
-        email: "rahma@gmail.com",
-        role: "Operator",
-    },
-    // Tambahkan lebih banyak user jika perlu
-]);
+// Get users from useUser composable
+const { usersQuery, deleteUser } = useUser();
 
 const roleOptions = ["Admin", "Operator"];
-
 const filteredData = computed(() => {
-    return users.value.filter((user) => {
+    if (!usersQuery.data.value) return [];
+
+    return usersQuery.data.value.filter((user) => {
+        // Safe property access with optional chaining and nullish coalescing
+        const username = user.username?.toLowerCase() ?? "";
+        const name = user.name?.toLowerCase() ?? "";
+        const searchTerm = search.value.toLowerCase();
+
         const matchSearch =
-            user.username.toLowerCase().includes(search.value.toLowerCase()) ||
-            user.nama.toLowerCase().includes(search.value.toLowerCase());
+            username.includes(searchTerm) || name.includes(searchTerm);
 
         const matchRole = selectedRole.value
             ? user.role === selectedRole.value
@@ -134,7 +62,6 @@ const filteredData = computed(() => {
         return matchSearch && matchRole;
     });
 });
-
 const pagedData = computed(() => {
     const start = (currentPage.value - 1) * rowsPerPage;
     return filteredData.value.slice(start, start + rowsPerPage);
@@ -143,6 +70,14 @@ const pagedData = computed(() => {
 const totalPages = computed(() => {
     return Math.ceil(filteredData.value.length / rowsPerPage);
 });
+
+const isDialogVisible = ref(false);
+
+const handleDelete = (id) => {
+    if (confirm("Are you sure you want to delete this user?")) {
+        deleteUser.mutate(id);
+    }
+};
 </script>
 
 <template>
@@ -155,7 +90,7 @@ const totalPages = computed(() => {
 
         <!-- Header actions -->
         <div class="flex justify-between items-center mb-4">
-            <Dialog>
+            <Dialog v-model:open="isDialogVisible">
                 <DialogTrigger>
                     <Button variant="default" class="gap-2">
                         <Plus class="h-4 w-4" />
@@ -163,13 +98,13 @@ const totalPages = computed(() => {
                     </Button>
                 </DialogTrigger>
                 <DialogContent>
-                    <AddUserDialog />
+                    <AddUserDialog @success="isDialogVisible = false" />
                 </DialogContent>
             </Dialog>
             <div class="flex gap-2 items-center">
                 <Select v-model="selectedRole">
                     <SelectTrigger class="w-40">
-                        {{ selectedRole || "Semua Role" }}
+                        {{ "Semua Role" }}
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem :value="''">Semua Role</SelectItem>
@@ -209,8 +144,8 @@ const totalPages = computed(() => {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow v-for="user in pagedData" :key="user.no">
-                        <TableCell>{{ user.no }}</TableCell>
+                    <TableRow v-for="(user, index) in pagedData" :key="user.no">
+                        <TableCell> {{ index + 1 }}</TableCell>
                         <TableCell>
                             <div class="flex gap-2 justify-center">
                                 <Pencil

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,13 +28,27 @@ import {
     XCircle,
 } from "lucide-vue-next";
 import AddBarangMasuk from "../Dialog/AddBarangMasuk.vue";
-
+import { useItems } from "@/composables/useItems";
 // Data and state
 const kategori = ref("");
 const subKategori = ref("");
 const tahun = ref("");
 const search = ref("");
 const dialogVisible = ref(false);
+
+const { itemsQuery } = useItems();
+
+// Pagination
+const currentPage = ref(1);
+const itemsPerPage = 2;
+
+const pagedData = computed(() => {
+    if (!itemsQuery.value?.data) return [];
+    const start = (currentPage.value - 1) * itemsPerPage;
+    return itemsQuery.value.data.slice(start, start + itemsPerPage);
+});
+
+const totalItems = computed(() => itemsQuery.value?.data?.length || 0);
 
 const openDialog = () => {
     dialogVisible.value = true;
@@ -46,39 +60,6 @@ const closeDialog = () => {
 const kategoriOptions = ["ATK", "Elektronik"];
 const subKategoriOptions = ["Pulpen", "Kertas"];
 const tahunOptions = ["2023", "2024"];
-
-const data = [
-    {
-        no: 1,
-        tanggal: "04/10/23 10:00:00",
-        asalBarang: "PT. Sidomakmur",
-        penerima: "Liana",
-        unit: "Gudang Utama",
-        kode: "ATK0001",
-        nama: "Kertas HVS A4 60Gr",
-        harga: "61.000",
-        jumlah: "4 Rim",
-        total: "244.000",
-        status: true,
-    },
-    {
-        no: 2,
-        tanggal: "01/10/23 11:00:00",
-        asalBarang: "PT. Sejahtera",
-        penerima: "Liana",
-        unit: "Gudang Utama",
-        kode: "ATK0002",
-        nama: "Bolpoint Pilot Std",
-        harga: "20.000",
-        jumlah: "1 Dus",
-        total: "20.000",
-        status: true,
-    },
-];
-
-// Pagination
-const currentPage = ref(1);
-const itemsPerPage = 2;
 </script>
 
 <template>
@@ -90,7 +71,7 @@ const itemsPerPage = 2;
             </Button>
         </div>
         <AddBarangMasuk
-            v-show="dialogVisible"
+            v-if="dialogVisible"
             :visible="dialogVisible"
             @update:visible="closeDialog"
         />
@@ -168,7 +149,7 @@ const itemsPerPage = 2;
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        <TableRow v-for="item in data" :key="item.no">
+                        <TableRow v-for="item in pagedData" :key="item.no">
                             <TableCell>{{ item.no }}</TableCell>
                             <TableCell>
                                 <div class="flex gap-2">
@@ -213,7 +194,7 @@ const itemsPerPage = 2;
                 <Button
                     variant="outline"
                     size="sm"
-                    :disabled="currentPage * itemsPerPage >= data.length"
+                    :disabled="currentPage * itemsPerPage >= totalItems"
                     @click="currentPage++"
                 >
                     <ChevronRight class="h-4 w-4" />

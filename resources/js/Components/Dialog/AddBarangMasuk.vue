@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,23 @@ import {
     SelectItem,
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { useToast } from "@/components/ui/toast/use-toast";
+import { Calendar as CalendarIcon } from "lucide-vue-next";
+import { useQuery, useMutation } from "@tanstack/vue-query";
+import axios from "axios";
+import { debounce } from "lodash-es";
+import { useKategori } from "@/composables/useKategori";
+import { useSubKategori } from "@/composables/useSubKategori";
+import { useDokumen } from "@/composables/useDokumen";
 
+const { uploadDokumen } = useDokumen();
+
+const { toast } = useToast();
 const isAdmin = ref(false); // Set to true if admin
 const props = defineProps({
     visible: {
@@ -17,9 +33,25 @@ const props = defineProps({
         required: true,
     },
 });
-const emit = defineEmits(["update:visible"]);
+const emit = defineEmits(["update:visible", "submitted"]);
+const { kategoris, isLoading: isLoadingKategori } = useKategori();
+// const { subKategorisQuery } = useSubKategori();
 
-// Form data
+const kategoriOptions = computed(() => {
+    return (
+        kategoris.value?.map((kategori) => ({
+            id: kategori.id,
+            name: kategori.nama_kategori, // or whatever field name your backend returns
+        })) || []
+    );
+});
+const { subKategoriOptions, subKategorisQuery } = useSubKategori();
+
+console.log("Kategori Options:", kategoriOptions);
+
+
+console.log("Sub Kategori Options:", subKategoriOptions.value);
+// Form data with localStorage persistence
 const form = ref({
     operator: null,
     kategori: null,
@@ -40,28 +72,22 @@ const form = ref({
     ],
 });
 
-// Options for dropdowns (mock data - replace with your API calls)
-const operatorOptions = ref([
-    { id: 1, name: "Budi" },
-    { id: 2, name: "Andi" },
-    { id: 3, name: "Siti" },
-]);
+// Load draft from localStorage
+const loadDraft = () => {
+    const draft = localStorage.getItem("barangMasukDraft");
+    if (draft) {
+        form.value = JSON.parse(draft);
+    }
+};
 
-const kategoriOptions = ref([
-    { id: 1, name: "Perlengkapan Kantor" },
-    { id: 2, name: "Elektronik" },
-    { id: 3, name: "Furniture" },
-]);
-
-const subKategoriOptions = ref([]);
-const allSubKategori = ref([
-    { id: 1, kategoriId: 1, name: "Alat Tulis", batasHarga: 5000000 },
-    { id: 2, kategoriId: 1, name: "Kertas", batasHarga: 3000000 },
-    { id: 3, kategoriId: 2, name: "Komputer", batasHarga: 15000000 },
-    { id: 4, kategoriId: 2, name: "Printer", batasHarga: 8000000 },
-    { id: 5, kategoriId: 3, name: "Meja", batasHarga: 5000000 },
-    { id: 6, kategoriId: 3, name: "Kursi", batasHarga: 4000000 },
-]);
+// Save draft to localStorage
+watch(
+    form,
+    (newValue) => {
+        localStorage.setItem("barangMasukDraft", JSON.stringify(newValue));
+    },
+    { deep: true }
+);
 
 // Errors
 const errors = ref({
@@ -73,6 +99,42 @@ const errors = ref({
     barang: [],
 });
 
+// Fetch operators
+const { data: operatorOptions } = useQuery({
+    queryKey: ["operators"],
+    queryFn: async () => {
+        const { data } = await axios.get("/api/operators");
+        return data;
+    },
+    initialData: [],
+});
+
+// Update the loadSubKategori method to use your hook
+const loadSubKategori = async () => {
+    form.value.subKategori = null;
+    form.value.batasHarga = null;
+};
+
+// Update the loadBatasHarga method
+const loadBatasHarga = () => {
+    const selectedSubKategori = subKategoriOptions.value?.find(
+        (sub) => sub.id === form.value.subKategori
+    );
+    form.value.batasHarga = selectedSubKategori
+        ? selectedSubKategori.batasHarga
+        : null;
+};
+
+// Watch for kategori changes to load subkategori
+watch(
+    () => form.value.kategori,
+    (newVal) => {
+        if (newVal) {
+            loadSubKategori();
+        }
+    }
+);
+
 // Computed properties
 const totalKeseluruhan = computed(() => {
     return form.value.barang.reduce((sum, item) => sum + (item.total || 0), 0);
@@ -83,24 +145,94 @@ const isOverBudget = computed(() => {
     return totalKeseluruhan.value > form.value.batasHarga;
 });
 
+
+const {} = useItems()
+// Mutation for submitting the form
+
+const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    try {
+        await createItemMutation.mutateAsync({
+            ...form.value,
+            items: form.value.barang, // Rename to match API expectation
+        });
+
+        toast.success("Barang masuk berhasil dicatat");
+        resetForm();
+        emit("update:visible", false);
+        emit("submitted");
+    } catch (error) {
+        console.error("Submission error:", error);
+    }
+};
+const { mutateAsync: submitFormMutation, isLoading: isSubmitting } =
+    useMutation({
+        mutationFn: async (formData) => {
+            let lampiranUrl = null;
+
+            // Upload file if exists using useDokumen
+            if (formData.lampiran) {
+                lampiranUrl = await uploadDokumen(formData.lampiran);
+            }
+
+            // Prepare data to send
+            const payload = {
+                ...formData,
+                lampiran: lampiranUrl,
+                barang: formData.barang,
+            };
+            await createItemMutation.mutateAsync({
+                ...form.value,
+                items: form.value.barang, // Rename to match API expectation
+            });
+
+            const response = await axios.post("/api/barang-masuk", payload);
+
+            return response.data;
+        },
+        onSuccess: (data) => {
+            toast({
+                title: "Sukses",
+                description: data.message || "Data berhasil disimpan",
+                variant: "success",
+            });
+            resetForm();
+            emit("update:visible", false);
+            emit("submitted");
+        },
+        onError: (error) => {
+            let errorMessage = "Gagal menyimpan data";
+
+            if (axios.isAxiosError(error)) {
+                errorMessage = error.response?.data?.message || error.message;
+
+                if (error.response?.status === 422) {
+                    const validationErrors = error.response.data.errors;
+                    Object.entries(validationErrors).forEach(
+                        ([field, messages]) => {
+                            if (field.startsWith("barang.")) {
+                                const [_, index, prop] = field.split(".");
+                                if (!errors.value.barang[index])
+                                    errors.value.barang[index] = {};
+                                errors.value.barang[index][prop] = messages[0];
+                            } else {
+                                errors.value[field] = messages[0];
+                            }
+                        }
+                    );
+                }
+            }
+
+            toast({
+                title: "Error",
+                description: errorMessage,
+                variant: "destructive",
+            });
+        },
+    });
+
 // Methods
-const loadSubKategori = () => {
-    form.value.subKategori = null;
-    form.value.batasHarga = null;
-    subKategoriOptions.value = allSubKategori.value.filter(
-        (sub) => sub.kategoriId === form.value.kategori
-    );
-};
-
-const loadBatasHarga = () => {
-    const selectedSubKategori = allSubKategori.value.find(
-        (sub) => sub.id === form.value.subKategori
-    );
-    form.value.batasHarga = selectedSubKategori
-        ? selectedSubKategori.batasHarga
-        : null;
-};
-
 const addBarangRow = () => {
     form.value.barang.push({
         namaBarang: "",
@@ -114,17 +246,54 @@ const addBarangRow = () => {
 };
 
 const removeBarangRow = (index) => {
+    if (form.value.barang[index].harga > 0) {
+        if (!confirm("Anda yakin ingin menghapus barang ini?")) return;
+    }
     form.value.barang.splice(index, 1);
     errors.value.barang.splice(index, 1);
 };
 
-const calculateTotal = (index) => {
+const calculateTotal = debounce((index) => {
     const item = form.value.barang[index];
     item.total = (item.harga || 0) * (item.jumlah || 0);
-};
+}, 300);
 
 const handleFileUpload = (event) => {
-    form.value.lampiran = event.target.files[0];
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = [
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/zip",
+    ];
+    if (
+        !allowedTypes.includes(file.type) &&
+        !file.name.match(/\.(doc|docx|zip)$/)
+    ) {
+        toast({
+            title: "Error",
+            description:
+                "Format file tidak didukung. Harap unggah file doc, docx, atau zip.",
+            variant: "destructive",
+        });
+        event.target.value = "";
+        return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+        toast({
+            title: "Error",
+            description: "Ukuran file terlalu besar. Maksimal 5MB.",
+            variant: "destructive",
+        });
+        event.target.value = "";
+        return;
+    }
+
+    form.value.lampiran = file;
 };
 
 const formatCurrency = (value) => {
@@ -134,6 +303,15 @@ const formatCurrency = (value) => {
         currency: "IDR",
         minimumFractionDigits: 0,
     }).format(value);
+};
+
+const formatDate = (date) => {
+    if (!date) return "";
+    return new Date(date).toLocaleDateString("id-ID", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    });
 };
 
 const validateForm = () => {
@@ -197,11 +375,17 @@ const validateForm = () => {
         if (!item.harga) {
             errors.value.barang[index].harga = "Harga wajib diisi";
             isValid = false;
+        } else if (item.harga < 0) {
+            errors.value.barang[index].harga = "Harga tidak boleh negatif";
+            isValid = false;
         }
 
         // Validate jumlah
         if (!item.jumlah) {
             errors.value.barang[index].jumlah = "Jumlah wajib diisi";
+            isValid = false;
+        } else if (item.jumlah <= 0) {
+            errors.value.barang[index].jumlah = "Jumlah harus lebih dari 0";
             isValid = false;
         }
 
@@ -218,29 +402,91 @@ const validateForm = () => {
     return isValid;
 };
 
-const submitForm = () => {
-    if (validateForm()) {
-        if (isOverBudget.value) {
-            alert("Total harga melebihi batas harga sub kategori!");
-            return;
-        }
+const submitForm = async () => {
+    if (!validateForm()) return;
 
-        // Here you would typically call your API to save the data
-        console.log("Form submitted:", form.value);
-        alert("Data berhasil disimpan!");
-        // router.push("/barang-masuk");
-        emit("update:visible", false);
+    if (isOverBudget.value) {
+        toast({
+            title: "Peringatan",
+            description: `Total harga melebihi batas harga sub kategori sebesar ${formatCurrency(
+                totalKeseluruhan.value - form.value.batasHarga
+            )}`,
+            variant: "destructive",
+        });
+        return;
+    }
+
+    try {
+        await submitFormMutation(form.value);
+    } catch (error) {
+        console.error("Submission error:", error);
     }
 };
 
-// Initialize form based on user role
+const resetForm = () => {
+    form.value = {
+        operator: isAdmin.value ? null : operatorOptions.value[0]?.id || null,
+        kategori: null,
+        subKategori: null,
+        batasHarga: null,
+        asalBarang: "",
+        nomorSurat: "",
+        lampiran: null,
+        barang: [
+            {
+                namaBarang: "",
+                harga: null,
+                jumlah: 1,
+                satuan: "",
+                total: 0,
+                tglExpired: null,
+            },
+        ],
+    };
+    errors.value = {
+        operator: null,
+        kategori: null,
+        subKategori: null,
+        asalBarang: null,
+        nomorSurat: null,
+        barang: [],
+    };
+    localStorage.removeItem("barangMasukDraft");
+};
+
+// Keyboard shortcuts
+const handleKeyDown = (e) => {
+    if (e.ctrlKey && e.key === "Enter") {
+        submitForm();
+    }
+};
+
+// Watch for dialog open to reset form if needed
+watch(
+    () => props.visible,
+    (val) => {
+        if (val) {
+            loadDraft();
+        }
+    }
+);
+
+// Initialize form
 onMounted(() => {
+    loadDraft();
+    window.addEventListener("keydown", handleKeyDown);
+
     // Set operator automatically if not admin
-    if (!isAdmin.value) {
-        form.value.operator = 1; // Assuming current user is Budi (id: 1)
+    if (!isAdmin.value && operatorOptions.value.length > 0) {
+        form.value.operator = operatorOptions.value[0].id;
     }
 });
+
+onUnmounted(() => {
+    window.removeEventListener("keydown", handleKeyDown);
+});
 </script>
+
 <template>
     <div class="h-full p-4">
         <h1 class="text-2xl font-bold mb-6">Barang Masuk</h1>
@@ -320,14 +566,17 @@ onMounted(() => {
                         >
                         <Select
                             v-model="form.subKategori"
-                            :disabled="!form.kategori"
+                            :disabled="!form.kategori || isLoadingSubKategori"
                             @update:modelValue="loadBatasHarga"
                         >
                             <SelectTrigger class="w-full border">
                                 {{
-                                    subKategoriOptions.find(
-                                        (opt) => opt.id === form.subKategori
-                                    )?.name || "Pilih Sub Kategori"
+                                    isLoadingSubKategori
+                                        ? "Memuat..."
+                                        : subKategoriOptions.find(
+                                              (opt) =>
+                                                  opt.id === form.subKategori
+                                          )?.name || "Pilih Sub Kategori"
                                 }}
                             </SelectTrigger>
                             <SelectContent>
@@ -336,7 +585,9 @@ onMounted(() => {
                                     :key="opt.id"
                                     :value="opt.id"
                                 >
-                                    {{ opt.name }}
+                                    {{ opt.name }} ({{
+                                        formatCurrency(opt.batasHarga)
+                                    }})
                                 </SelectItem>
                             </SelectContent>
                         </Select>
@@ -351,9 +602,10 @@ onMounted(() => {
                             >Batas Harga</label
                         >
                         <Input
-                            v-model="form.batasHarga"
+                            :value="formatCurrency(form.batasHarga)"
                             readonly
                             class="w-full"
+                            :class="{ 'border-red-500': isOverBudget }"
                         />
                     </div>
 
@@ -546,7 +798,7 @@ onMounted(() => {
                                 <!-- Total -->
                                 <td class="py-2 px-4 border">
                                     <Input
-                                        v-model="item.total"
+                                        :value="formatCurrency(item.total)"
                                         readonly
                                         class="w-full"
                                     />
@@ -554,10 +806,35 @@ onMounted(() => {
 
                                 <!-- Tgl Expired -->
                                 <td class="py-2 px-4 border">
-                                    <!-- <Calendar
-                                        v-model="item.tglExpired"
-                                        class="w-full"
-                                    /> -->
+                                    <Popover>
+                                        <PopoverTrigger as-child>
+                                            <Button
+                                                variant="outline"
+                                                class="w-full justify-start text-left font-normal"
+                                                :class="{
+                                                    'text-muted-foreground':
+                                                        !item.tglExpired,
+                                                }"
+                                            >
+                                                <CalendarIcon
+                                                    class="mr-2 h-4 w-4"
+                                                />
+                                                {{
+                                                    item.tglExpired
+                                                        ? formatDate(
+                                                              item.tglExpired
+                                                          )
+                                                        : "Pilih tanggal"
+                                                }}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent class="w-auto p-0">
+                                            <Calendar
+                                                v-model="item.tglExpired"
+                                                initial-focus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
                                 </td>
 
                                 <!-- Aksi -->
@@ -578,13 +855,20 @@ onMounted(() => {
                 <div class="mt-4 flex justify-between items-center">
                     <div class="font-semibold">
                         Total Keseluruhan:
-                        {{ formatCurrency(totalKeseluruhan) }}
+                        <span :class="{ 'text-red-500': isOverBudget }">
+                            {{ formatCurrency(totalKeseluruhan) }}
+                        </span>
                     </div>
                     <div v-if="form.batasHarga" class="font-semibold">
                         Batas Harga: {{ formatCurrency(form.batasHarga) }}
-                        <span v-if="isOverBudget" class="text-red-500 ml-2"
-                            >(Melebihi batas!)</span
-                        >
+                        <span v-if="isOverBudget" class="text-red-500 ml-2">
+                            (Melebihi batas
+                            {{
+                                formatCurrency(
+                                    totalKeseluruhan - form.batasHarga
+                                )
+                            }})
+                        </span>
                     </div>
                 </div>
             </div>
@@ -600,20 +884,12 @@ onMounted(() => {
                 <Button
                     variant="default"
                     @click="submitForm"
-                    :disabled="isOverBudget"
+                    :disabled="isOverBudget || isSubmitting"
                 >
-                    Simpan
+                    <span v-if="isSubmitting">Menyimpan...</span>
+                    <span v-else>Simpan (Ctrl+Enter)</span>
                 </Button>
             </div>
         </div>
     </div>
 </template>
-
-<style scoped>
-.border-red-500 {
-    border-color: #f44336 !important;
-}
-.text-red-500 {
-    color: #f44336;
-}
-</style>
