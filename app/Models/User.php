@@ -33,6 +33,11 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    public function dokumen()
+    {
+        return $this->hasMany(Dokumen::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
