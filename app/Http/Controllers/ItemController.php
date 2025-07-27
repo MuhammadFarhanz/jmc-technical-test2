@@ -2,20 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreItemRequest;
-use App\Http\Requests\UpdateItemRequest;
 use App\Models\Item;
-use Illuminate\Http\JsonResponse;
+use App\Models\SubKategori;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class ItemController extends Controller
 {
+
     /**
-     * Display a listing of the resource.
+     * Display a listing of all items.
      */
-    public function index(): JsonResponse
+    public function index()
     {
-        $items = Item::with(['dokumen', 'subKategori'])
+        // Get all items with their related kategori, subKategori, and user data
+        $items = Item::with(['kategori', 'subKategori', 'user'])
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
@@ -25,94 +26,45 @@ class ItemController extends Controller
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(Request $request)
     {
-        //
-    }
+        $validated = $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'kategori_id' => 'required|exists:kategori,id',
+            'sub_kategori_id' => 'required|exists:sub_kategori,id',
+            'nomor_surat' => 'required|string|max:200|unique:items,nomor_surat',
+            'asal_barang' => 'required|string|max:200',
+            'lampiran' => 'nullable|file|mimes:doc,docx,zip|max:2048',
+            'barang' => 'required|array|min:1',
+            'barang.*.nama' => 'required|string|max:200',
+            'barang.*.harga' => 'required|numeric|min:0',
+            'barang.*.jumlah' => 'required|integer|min:1',
+            'barang.*.satuan' => 'required|string|max:50',
+            'barang.*.tgl_expired' => 'nullable|date',
+        ]);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(StoreItemRequest $request): JsonResponse
-    {
-        $validated = $request->validated();
+  
+        $totalHarga = collect($validated['barang'])->sum(fn($item) => $item['harga'] * $item['jumlah']);
+        $totalItem = count($validated['barang']);
 
-        // Calculate total
-        $validated['total'] = $validated['harga'] * $validated['kuantitas'];
-
-        $item = Item::create($validated);
-
-        // Load relationships for response
-        $item->load(['dokumen', 'subKategori']);
+        $item = Item::create([
+            'user_id' => $validated['user_id'],
+            'kategori_id' => $validated['kategori_id'],
+            'sub_kategori_id' => $validated['sub_kategori_id'],
+            'batas_harga' => SubKategori::find($validated['sub_kategori_id'])->batas_harga,
+            'nomor_surat' => $validated['nomor_surat'],
+            'asal_barang' => $validated['asal_barang'],
+            'lampiran_path' => $request->hasFile('lampiran')
+                ? $request->file('lampiran')->store('lampiran')
+                : null,
+            'daftar_barang' => $validated['barang'],
+            'total_item' => $totalItem,
+            'total_harga' => $totalHarga
+        ]);
 
         return response()->json([
-            'success' => true,
-            'data' => $item,
-            'message' => 'Item berhasil ditambahkan'
-        ], 201);
-    }
-
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id): JsonResponse
-    {
-        $item = Item::with(['dokumen', 'subKategori'])->findOrFail($id);
-
-        return response()->json([
-            'success' => true,
+            'message' => 'Data berhasil disimpan',
             'data' => $item
-        ]);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(UpdateItemRequest $request, string $id): JsonResponse
-    {
-        $item = Item::findOrFail($id);
-        $validated = $request->validated();
-
-        // Recalculate total if price or quantity changed
-        if (isset($validated['harga']) || isset($validated['kuantitas'])) {
-            $harga = $validated['harga'] ?? $item->harga;
-            $kuantitas = $validated['kuantitas'] ?? $item->kuantitas;
-            $validated['total'] = $harga * $kuantitas;
-        }
-
-        $item->update($validated);
-        $item->refresh()->load(['dokumen', 'subKategori']);
-
-        return response()->json([
-            'success' => true,
-            'data' => $item,
-            'message' => 'Item berhasil diperbarui'
-        ]);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id): JsonResponse
-    {
-        $item = Item::findOrFail($id);
-        $item->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Item berhasil dihapus'
-        ]);
+        ], 201);
     }
 }

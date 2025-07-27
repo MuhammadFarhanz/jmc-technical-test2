@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
@@ -89,5 +90,25 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->delete();
         return response()->json(['message' => 'User deleted']);
+    }
+
+    public function operators()
+    {
+        $operators = User::where('role', 'Operator')->get();
+        return response()->json($operators);
+    }
+
+    /**
+     * Get current authenticated user
+     */
+    public function current()
+    {
+        $user = Auth::user();
+        return response()->json([
+            'id' => $user->id,
+            'name' => $user->name,
+            'role' => $user->role,
+            'isAdmin' => $user->role === 'Admin'
+        ]);
     }
 }
