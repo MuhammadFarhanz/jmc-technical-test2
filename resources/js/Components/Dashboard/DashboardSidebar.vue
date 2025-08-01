@@ -1,19 +1,12 @@
 <script setup>
 import { ref } from "vue";
 import { Link } from "@inertiajs/vue3";
-
 const menuItems = ref([
     {
         label: "Master Data",
         items: [
-            {
-                label: "Kategori",
-                href: "/master-data/kategori",
-            },
-            {
-                label: "Sub Kategori",
-                href: "/master-data/sub-kategori",
-            },
+            { label: "Kategori", href: "/master-data/kategori" },
+            { label: "Sub Kategori", href: "/master-data/sub-kategori" },
         ],
     },
 ]);
@@ -24,32 +17,28 @@ const menuItems = ref([
             Aplikasi Pengelolaan Barang
         </div>
         <Link
-            href="/dashboard"
+            :href="route('dashboard')"
             class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
         >
-            <i class="pi pi-box"></i>
-            <span>Barang Masuk</span>
+            <i class="pi pi-box"></i> <span>Barang Masuk</span>
         </Link>
         <Link
-            href="/master-data/kategori"
+            :href="route('master-data.kategori')"
             class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
         >
-            <i class="pi pi-box"></i>
-            <span>kategori</span>
+            <i class="pi pi-box"></i> <span>kategori</span>
         </Link>
         <Link
-            href="/master-data/sub-kategori"
+            :href="route('master-data.sub-kategori')"
             class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
         >
-            <i class="pi pi-box"></i>
-            <span>sub katori</span>
+            <i class="pi pi-box"></i> <span>Sub Kategori</span>
         </Link>
         <Link
-            href="/manajemen-user"
+            :href="route('manajemen-user')"
             class="flex items-center gap-2 cursor-pointer py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
         >
-            <i class="pi pi-box"></i>
-            <span>Manajemen User</span>
+            <i class="pi pi-box"></i> <span>Manajemen User</span>
         </Link>
     </div>
 </template>

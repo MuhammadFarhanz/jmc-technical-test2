@@ -95,11 +95,9 @@ const tahunOptions = computed(() => {
     return Array.from(years).sort((a, b) => b - a);
 });
 
-
 const filteredItems = computed(() => {
     let results = [...props.items];
 
-  
     if (filters.value.kategori) {
         results = results.filter(
             (item) => item.kategori_id == filters.value.kategori
@@ -153,9 +151,7 @@ const filteredItems = computed(() => {
             return direction === "asc"
                 ? new Date(a[field]) - new Date(b[field])
                 : new Date(b[field]) - new Date(a[field]);
-        }
-    
-        else {
+        } else {
             return direction === "asc"
                 ? String(a[field] || "").localeCompare(String(b[field] || ""))
                 : String(b[field] || "").localeCompare(String(a[field] || ""));
@@ -184,7 +180,6 @@ const currentPageRange = computed(() => {
     return { start, end };
 });
 
-
 const handlePageChange = (newPage) => {
     currentPage.value = newPage;
 };
@@ -199,8 +194,6 @@ const formatDate = (dateString) =>
 
 const formatCurrency = (value) => value?.toLocaleString("id-ID") || "0";
 
-const openDialog = () => (dialogVisible.value = true);
-const closeDialog = () => (dialogVisible.value = false);
 
 const printSuratMasuk = (item) => {
     const printWindow = window.open("", "_blank");
@@ -285,6 +278,28 @@ const toggleVerification = async (item) => {
     }
 };
 
+const editingItem = ref(null);
+const isEditing = ref(false);
+
+const openDialog = () => {
+    editingItem.value = null;
+    isEditing.value = false;
+    dialogVisible.value = true;
+};
+
+const editItem = (item) => {
+    console.log
+    editingItem.value = item;
+    isEditing.value = true;
+    dialogVisible.value = true;
+};
+
+const closeDialog = () => {
+    dialogVisible.value = false;
+    editingItem.value = null;
+    isEditing.value = false;
+};
+
 // Watchers
 watch(
     filters,
@@ -322,6 +337,8 @@ watch(
         <AddBarang
             v-if="dialogVisible"
             :visible="dialogVisible"
+            :editing="isEditing"
+            :initialData="editingItem"
             @close="closeDialog"
             @success="closeDialog"
         />
@@ -499,6 +516,7 @@ watch(
                                                     variant="ghost"
                                                     size="icon"
                                                     title="Edit"
+                                                    @click="editItem(item)"
                                                 >
                                                     <Pencil
                                                         class="h-4 w-4 text-blue-600"

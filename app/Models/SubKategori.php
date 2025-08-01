@@ -9,7 +9,7 @@ class SubKategori extends Model
     protected $table = 'sub_kategori';
     protected $fillable = [
         'kategori_id',
-        'nama_subkategori', // Note this matches your migration
+        'nama_subkategori', 
         'batas_harga'
     ];
     public function kategori()

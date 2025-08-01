@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Kategori;
+use Inertia\Inertia;
 
 class KategoriController extends Controller
 {
@@ -13,9 +14,10 @@ class KategoriController extends Controller
     public function index()
     {
         $kategoris = Kategori::all();
-        return response()->json($kategoris);
+        return Inertia::render('Kategori/Index', [
+            'kategoris' => $kategoris
+        ]);
     }
-
     /**
      * Show the form for creating a new resource.
      */
@@ -28,14 +30,18 @@ class KategoriController extends Controller
     /**
      * Store a newly created resource in storage.
      */
+
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'kode_kategori' => 'required|string|unique:kategori,kode_kategori',
-            'nama_kategori' => 'required|string',
+            'nama_kategori' => 'required|string|max:100',
         ]);
-        $kategori = Kategori::create($validated);
-        return response()->json($kategori, 201);
+
+        Kategori::create($validated);
+
+        return redirect()->route('master-data.kategori')->with('success', 'Kategori berhasil ditambahkan.');
     }
 
     /**
@@ -62,12 +68,15 @@ class KategoriController extends Controller
     public function update(Request $request, string $id)
     {
         $kategori = Kategori::findOrFail($id);
+
         $validated = $request->validate([
             'kode_kategori' => 'required|string|unique:kategori,kode_kategori,' . $kategori->id,
-            'nama_kategori' => 'required|string',
+            'nama_kategori' => 'required|string|max:100',
         ]);
+
         $kategori->update($validated);
-        return response()->json($kategori);
+
+        return redirect()->route('master-data.kategori')->with('success', 'Kategori berhasil diperbarui.');
     }
 
     /**

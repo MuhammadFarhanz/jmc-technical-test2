@@ -2,6 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Kategori;
+use App\Models\SubKategori;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -27,13 +30,29 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>
      */
+    // public function share(Request $request): array
+    // {
+    //     return [
+    //         ...parent::share($request),
+    //         'auth' => [
+    //             'user' => $request->user(),
+    //         ],
+    //     ];
+    // }
+
     public function share(Request $request): array
     {
-        return [
-            ...parent::share($request),
+        return array_merge(parent::share($request), [
             'auth' => [
-                'user' => $request->user(),
+                'user' => fn() => $request->user()
+                    ? $request->user()->only(['id', 'name', 'email', 'role'])
+                    : null,
             ],
-        ];
+            'operators' => fn() => User::where('role', 'Operator')
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']),
+            'kategori' => fn() => Kategori::all(),
+            'subkategoris' => fn() => SubKategori::all(),
+        ]);
     }
 }

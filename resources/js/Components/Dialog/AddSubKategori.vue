@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from "vue";
+import { ref } from "vue";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,144 +9,83 @@ import {
     SelectItem,
     SelectValue,
 } from "@/components/ui/select";
-import { useSubKategori } from "@/composables/useSubKategori";
+import { useForm, usePage } from "@inertiajs/vue3";
 import { useToast } from "@/components/ui/toast/use-toast";
 
 const { toast } = useToast();
-const props = defineProps({
-    kategoriOptions: {
-        type: Array,
-        default: () => [],
-    },
-    initialData: {
-        type: Object,
-        default: null, // Allow null initially
-    },
-});
+const { kategori } = usePage().props;
 
 const emit = defineEmits(["success", "cancel"]);
 
-// Initialize form with empty values
-const form = ref({
+// Initialize form with Inertia's useForm
+const form = useForm({
     kategori_id: "",
     nama_subkategori: "",
     batas_harga: "",
 });
 
-const errors = ref({
-    kategori_id: null,
-    nama_subkategori: null,
-    batas_harga: null,
-});
-
-const { createSubKategori, updateSubKategori } = useSubKategori();
-const isEditing = ref(false);
-const isSubmitting = ref(false);
-
-// Initialize or reset form
-const initForm = () => {
-    const initialData = props.initialData || {};
-    form.value = {
-        kategori_id: initialData.kategori_id || "",
-        nama_subkategori: initialData.nama_subkategori || "",
-        batas_harga: initialData.batas_harga || "",
-    };
-    isEditing.value = !!initialData.id;
-    errors.value = {
-        kategori_id: null,
-        nama_subkategori: null,
-        batas_harga: null,
-    };
-};
-
-// Initialize on mount and when initialData changes
-initForm();
-watch(() => props.initialData, initForm);
-
 const validate = () => {
     let valid = true;
-    errors.value = {
-        kategori_id: null,
-        nama_subkategori: null,
-        batas_harga: null,
-    };
+    form.clearErrors();
 
-    if (!form.value.kategori_id) {
-        errors.value.kategori_id = "Kategori wajib dipilih";
+    if (!form.kategori_id) {
+        form.setError("kategori_id", "Kategori wajib dipilih");
         valid = false;
     }
 
-    if (!form.value.nama_subkategori.trim()) {
-        errors.value.nama_subkategori = "Nama sub kategori wajib diisi";
+    if (!form.nama_subkategori.trim()) {
+        form.setError("nama_subkategori", "Nama sub kategori wajib diisi");
         valid = false;
-    } else if (form.value.nama_subkategori.length > 100) {
-        errors.value.nama_subkategori = "Maksimal 100 karakter";
+    } else if (form.nama_subkategori.length > 100) {
+        form.setError("nama_subkategori", "Maksimal 100 karakter");
         valid = false;
     }
 
-    if (form.value.batas_harga && isNaN(Number(form.value.batas_harga))) {
-        errors.value.batas_harga = "Batas harga harus berupa angka";
+    if (!form.batas_harga) {
+        form.setError("batas_harga", "Batas harga wajib diisi");
+        valid = false;
+    } else if (Number(form.batas_harga) < 1) {
+        form.setError("batas_harga", "Batas harga minimal 1");
         valid = false;
     }
 
     return valid;
 };
 
-const submit = async () => {
+const submit = () => {
     if (!validate()) return;
 
-    isSubmitting.value = true;
+    const payload = {
+        kategori_id: form.kategori_id,
+        nama_subkategori: form.nama_subkategori,
+        batas_harga: form.batas_harga || null,
+    };
 
-    try {
-        const payload = {
-            kategori_id: form.value.kategori_id,
-            nama_subkategori: form.value.nama_subkategori,
-            batas_harga: form.value.batas_harga || null,
-        };
-
-        if (isEditing.value) {
-            await updateSubKategori.mutateAsync({
-                id: props.initialData.id,
-                ...payload,
-            });
-            toast({
-                title: "Berhasil",
-                description: "Sub kategori berhasil diperbarui",
-                variant: "default",
-            });
-        } else {
-            await createSubKategori.mutateAsync(payload);
+    form.post(route("subkategori.store"), {
+        data: payload,
+        preserveScroll: true,
+        onSuccess: () => {
             toast({
                 title: "Berhasil",
                 description: "Sub kategori berhasil ditambahkan",
-                variant: "default",
             });
-        }
-
-        emit("success");
-    } catch (error) {
-        if (error.response?.data?.errors) {
-            errors.value = {
-                ...errors.value,
-                ...error.response.data.errors,
-            };
-        }
-        toast({
-            title: "Gagal",
-            description: error.response?.data?.message || "Terjadi kesalahan",
-            variant: "destructive",
-        });
-    } finally {
-        isSubmitting.value = false;
-    }
+            form.reset();
+            emit("success");
+        },
+        onError: () => {
+            toast({
+                title: "Gagal",
+                description: "Terjadi kesalahan saat menyimpan data",
+                variant: "destructive",
+            });
+        },
+    });
 };
 </script>
 
 <template>
     <form @submit.prevent="submit" class="space-y-4">
-        <h2 class="text-lg font-semibold">
-            {{ isEditing ? "Edit Sub Kategori" : "Tambah Sub Kategori" }}
-        </h2>
+        <h2 class="text-lg font-semibold">Tambah Sub Kategori</h2>
 
         <!-- Kategori Select -->
         <div class="space-y-2">
@@ -159,16 +98,16 @@ const submit = async () => {
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem
-                        v-for="kategori in kategoriOptions"
-                        :key="kategori.id"
-                        :value="kategori.id"
+                        v-for="item in kategori"
+                        :key="item.id"
+                        :value="item.id"
                     >
-                        {{ kategori.nama_kategori || kategori.name }}
+                        {{ item.nama_kategori }}
                     </SelectItem>
                 </SelectContent>
             </Select>
-            <p v-if="errors.kategori_id" class="text-sm text-red-500">
-                {{ errors.kategori_id }}
+            <p v-if="form.errors.kategori_id" class="text-sm text-red-500">
+                {{ form.errors.kategori_id }}
             </p>
         </div>
 
@@ -180,9 +119,10 @@ const submit = async () => {
             <Input
                 v-model="form.nama_subkategori"
                 placeholder="Masukkan nama sub kategori"
+                :class="{ 'border-red-500': form.errors.nama_subkategori }"
             />
-            <p v-if="errors.nama_subkategori" class="text-sm text-red-500">
-                {{ errors.nama_subkategori }}
+            <p v-if="form.errors.nama_subkategori" class="text-sm text-red-500">
+                {{ form.errors.nama_subkategori }}
             </p>
         </div>
 
@@ -192,10 +132,12 @@ const submit = async () => {
             <Input
                 v-model="form.batas_harga"
                 type="number"
+                min="0"
                 placeholder="Masukkan batas harga"
+                :class="{ 'border-red-500': form.errors.batas_harga }"
             />
-            <p v-if="errors.batas_harga" class="text-sm text-red-500">
-                {{ errors.batas_harga }}
+            <p v-if="form.errors.batas_harga" class="text-sm text-red-500">
+                {{ form.errors.batas_harga }}
             </p>
         </div>
 
@@ -205,12 +147,12 @@ const submit = async () => {
                 type="button"
                 variant="outline"
                 @click="$emit('cancel')"
-                :disabled="isSubmitting"
+                :disabled="form.processing"
             >
                 Batal
             </Button>
-            <Button type="submit" :disabled="isSubmitting">
-                <span v-if="isSubmitting">Menyimpan...</span>
+            <Button type="submit" :disabled="form.processing">
+                <span v-if="form.processing">Menyimpan...</span>
                 <span v-else>Simpan</span>
             </Button>
         </div>

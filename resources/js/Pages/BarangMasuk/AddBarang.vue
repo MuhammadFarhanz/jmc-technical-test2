@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -7,6 +7,7 @@ import {
     SelectTrigger,
     SelectContent,
     SelectItem,
+    SelectValue,
 } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -17,8 +18,14 @@ import {
 import { useToast } from "@/components/ui/toast/use-toast";
 import { Calendar as CalendarIcon } from "lucide-vue-next";
 import { router, useForm, usePage } from "@inertiajs/vue3";
-import { format } from "date-fns";
-
+import {
+    CalendarDate,
+    DateFormatter,
+    getLocalTimeZone,
+    parseDate,
+    today,
+} from "@internationalized/date";
+import { parseISO } from "date-fns";
 // Constants
 const ALLOWED_FILE_TYPES = [
     "application/msword",
@@ -29,14 +36,23 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const { auth, kategori, subkategoris, operators } = usePage().props;
 const { toast } = useToast();
-defineProps({
+
+const props = defineProps({
     visible: Boolean,
+    editing: {
+        type: Boolean,
+        default: false,
+    },
+    initialData: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const emit = defineEmits(["close", "success"]);
 
 const form = useForm({
-    user_id: auth.user?.id || null,
+    user_id: auth.user?.id,
     kategori_id: null,
     sub_kategori_id: null,
     batas_harga: null,
@@ -44,13 +60,58 @@ const form = useForm({
     asal_barang: "",
     lampiran: null,
     barang: [createBarangItem()],
+    _method: "POST",
 });
+
+const isInitializing = ref(false);
+
+watch(
+    () => props.editing && props.initialData,
+    (shouldLoad) => {
+        if (shouldLoad && props.initialData.id) {
+            isInitializing.value = true;
+
+            const normalizedData = {
+                ...props.initialData,
+                batas_harga: props.initialData.batas_harga
+                    ? Number(props.initialData.batas_harga)
+                    : null,
+                barang:
+                    props.initialData.daftar_barang?.map((item) => ({
+                        ...item,
+                        harga: item.harga ? Number(item.harga) : null,
+                        jumlah: item.jumlah ? Number(item.jumlah) : 1,
+                    })) || [],
+            };
+
+            form.defaults({
+                ...normalizedData,
+                _method: "PUT",
+            }).reset();
+
+            nextTick(() => {
+                isInitializing.value = false;
+            });
+        } else if (!props.editing) {
+            // Explicitly set to false for create mode
+            isInitializing.value = false;
+        }
+    },
+    { immediate: true }
+);
+console.log(
+    form.barang.map((item) => item.tgl_expired),
+    "isi form"
+);
 
 const isAdmin = computed(() => auth.user?.role === "Admin");
 
-// Options for dropdowns
 const kategoriOptions = computed(
-    () => kategori?.map((k) => ({ id: k.id, name: k.nama_kategori })) || []
+    () =>
+        kategori?.map((k) => ({
+            id: k.id,
+            name: k.nama_kategori,
+        })) || []
 );
 
 const subKategoriOptions = computed(
@@ -58,30 +119,38 @@ const subKategoriOptions = computed(
         subkategoris?.map((sk) => ({
             id: sk.id,
             name: sk.nama_subkategori,
-            batas_harga: sk.batas_harga,
+            batas_harga: sk.batas_harga ? Number(sk.batas_harga) : 0,
             kategori_id: sk.kategori_id,
         })) || []
 );
 
-const filteredSubKategoriOptions = computed(() =>
-    form.kategori_id
-        ? subKategoriOptions.value.filter(
-              (sk) => sk.kategori_id === form.kategori_id
-          )
-        : []
-);
+const filteredSubKategoriOptions = computed(() => {
+    if (!form.kategori_id) return [];
+    return subKategoriOptions.value.filter(
+        (sk) => sk.kategori_id === form.kategori_id
+    );
+});
 
-const operatorOptions = computed(() =>
-    isAdmin.value
-        ? operators.map((op) => ({ id: op.id, name: op.name }))
-        : [{ id: auth.user.id, name: auth.user.name }]
-);
+const operatorOptions = computed(() => {
+    if (isAdmin.value) {
+        return operators.map((op) => ({
+            id: op.id,
+            name: op.name,
+        }));
+    }
+    return [
+        {
+            id: auth.user.id,
+            name: auth.user.name,
+        },
+    ];
+});
 
-// Watch for subkategori changes to update batas_harga
 watch(
     () => form.sub_kategori_id,
-    (newVal) => {
-        if (newVal) {
+    (newVal, oldVal) => {
+        // Only update batas_harga if not in edit mode or if the value actually changed
+        if (newVal && (!props.editing || newVal !== oldVal)) {
             const selected = subKategoriOptions.value.find(
                 (sk) => sk.id === newVal
             );
@@ -90,7 +159,6 @@ watch(
     }
 );
 
-// Calculate total price
 const totalKeseluruhan = computed(() =>
     form.barang.reduce(
         (total, item) => total + (item.harga || 0) * (item.jumlah || 0),
@@ -136,29 +204,49 @@ const handleFileChange = (e) => {
     }
 };
 
-// Form submission
 const submit = () => {
-    form.post(route("items.store"), {
-        preserveScroll: true,
-        onSuccess: () => {
-            toast({
-                title: "Sukses",
-                description: "Data berhasil disimpan",
-            });
-            emit("success");
-        },
-        onError: (errors) => {
-            if (errors.barang) {
-                toast({
-                    title: "Error",
-                    description: "Terdapat kesalahan pada data barang",
-                    variant: "destructive",
-                });
-            }
-        },
-    });
-};
+    const formData = {
+        ...form.data(),
+        barang: form.barang.map((item) => ({
+            ...item,
+            tgl_expired: item.tgl_expired
+                ? `${item.tgl_expired.year}-${String(
+                      item.tgl_expired.month
+                  ).padStart(2, "0")}-${String(item.tgl_expired.day).padStart(
+                      2,
+                      "0"
+                  )}`
+                : null,
+        })),
+    };
 
+    // Rest of your submit logic remains the same
+    if (props.editing) {
+        form.put(route("items.update", props.initialData.id), {
+            data: formData,
+            preserveScroll: true,
+            onSuccess: () => {
+                toast({
+                    title: "Sukses",
+                    description: "Data berhasil diperbarui",
+                });
+                emit("success");
+            },
+        });
+    } else {
+        form.post(route("items.store"), {
+            data: formData,
+            preserveScroll: true,
+            onSuccess: () => {
+                toast({
+                    title: "Sukses",
+                    description: "Data berhasil disimpan",
+                });
+                emit("success");
+            },
+        });
+    }
+};
 // Barang items management
 function createBarangItem() {
     return {
@@ -189,15 +277,13 @@ const formatCurrency = (value) => {
         minimumFractionDigits: 0,
     }).format(value);
 };
-
-const formatDate = (date) => {
-    return date ? format(new Date(date), "dd/MM/yyyy") : "";
-};
 </script>
 
 <template>
     <div class="h-full p-4">
-        <h1 class="text-2xl font-bold mb-6">Barang Masuk</h1>
+        <h1 class="text-2xl font-bold mb-6">
+            {{ editing ? "Edit Barang Masuk" : "Barang Masuk" }}
+        </h1>
 
         <div class="bg-white rounded-lg shadow p-6">
             <!-- INFORMASI UMUM -->
@@ -214,11 +300,13 @@ const formatDate = (date) => {
                         >
                         <Select v-model="form.user_id" :disabled="!isAdmin">
                             <SelectTrigger class="w-full border">
-                                {{
-                                    operatorOptions.find(
-                                        (o) => o.id === form.user_id
-                                    )?.name || "Select Operator"
-                                }}
+                                <SelectValue placeholder="Select Operator">
+                                    {{
+                                        operatorOptions.find(
+                                            (o) => o.id === form.user_id
+                                        )?.name || "Select Operator"
+                                    }}
+                                </SelectValue>
                             </SelectTrigger>
 
                             <SelectContent v-if="isAdmin">
@@ -245,11 +333,13 @@ const formatDate = (date) => {
                         </label>
                         <Select v-model="form.kategori_id">
                             <SelectTrigger class="w-full border">
-                                {{
-                                    kategoriOptions.find(
-                                        (opt) => opt.id === form.kategori_id
-                                    )?.name || "Pilih Kategori"
-                                }}
+                                <SelectValue placeholder="Pilih Kategori">
+                                    {{
+                                        kategoriOptions.find(
+                                            (opt) => opt.id === form.kategori_id
+                                        )?.name || "Pilih Kategori"
+                                    }}
+                                </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem
@@ -275,24 +365,24 @@ const formatDate = (date) => {
                         </label>
                         <Select
                             v-model="form.sub_kategori_id"
-                            :disabled="
-                                !form.kategori_id || isLoadingSubKategori
-                            "
+                            :disabled="!form.kategori_id || isInitializing"
                         >
                             <SelectTrigger class="w-full border">
-                                {{
-                                    isLoadingSubKategori
-                                        ? "Memuat..."
-                                        : subKategoriOptions.find(
-                                              (opt) =>
-                                                  opt.id ===
-                                                  form.sub_kategori_id
-                                          )?.name || "Pilih Sub Kategori"
-                                }}
+                                <SelectValue placeholder="Pilih Sub Kategori">
+                                    {{
+                                        isInitializing
+                                            ? "Memuat..."
+                                            : filteredSubKategoriOptions.find(
+                                                  (opt) =>
+                                                      opt.id ===
+                                                      form.sub_kategori_id
+                                              )?.name || "Pilih Sub Kategori"
+                                    }}
+                                </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem
-                                    v-for="opt in subKategoriOptions"
+                                    v-for="opt in filteredSubKategoriOptions"
                                     :key="opt.id"
                                     :value="opt.id"
                                 >
@@ -305,8 +395,9 @@ const formatDate = (date) => {
                         <small
                             v-if="form.errors.sub_kategori_id"
                             class="text-red-500"
-                            >{{ form.errors.sub_kategori_id }}</small
                         >
+                            {{ form.errors.sub_kategori_id }}
+                        </small>
                     </div>
 
                     <!-- Batas Harga -->
@@ -315,7 +406,11 @@ const formatDate = (date) => {
                             >Batas Harga</label
                         >
                         <Input
-                            :value="formatCurrency(form.batas_harga)"
+                            :value="
+                                isInitializing
+                                    ? 'Memuat...'
+                                    : formatCurrency(form.batas_harga || 0)
+                            "
                             readonly
                             class="w-full"
                             :class="{ 'border-red-500': isOverBudget }"
@@ -370,7 +465,7 @@ const formatDate = (date) => {
                         <input
                             type="file"
                             id="lampiran"
-                            @change="handleFileUpload"
+                            @change="handleFileChange"
                             accept=".doc,.docx,.zip"
                             class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                         />
@@ -382,6 +477,12 @@ const formatDate = (date) => {
                             class="text-red-500"
                             >{{ form.errors.lampiran }}</small
                         >
+                        <small
+                            v-if="editing && initialData.lampiran"
+                            class="text-blue-500"
+                        >
+                            File saat ini: {{ initialData.lampiran }}
+                        </small>
                     </div>
                 </div>
             </div>
@@ -432,8 +533,9 @@ const formatDate = (date) => {
                                         class="w-full"
                                         :class="{
                                             'border-red-500':
-                                                form.errors.barang?.[index]
-                                                    ?.nama,
+                                                form.errors[
+                                                    `barang.${index}.nama`
+                                                ],
                                         }"
                                     />
                                     <small
@@ -457,8 +559,9 @@ const formatDate = (date) => {
                                         min="1"
                                         :class="{
                                             'border-red-500':
-                                                form.errors.barang?.[index]
-                                                    ?.harga,
+                                                form.errors[
+                                                    `barang.${index}.harga`
+                                                ],
                                         }"
                                     />
                                     <small
@@ -482,8 +585,9 @@ const formatDate = (date) => {
                                         class="w-full"
                                         :class="{
                                             'border-red-500':
-                                                form.errors.barang?.[index]
-                                                    ?.jumlah,
+                                                form.errors[
+                                                    `barang.${index}.jumlah`
+                                                ],
                                         }"
                                     />
                                     <small
@@ -510,8 +614,9 @@ const formatDate = (date) => {
                                         class="w-full"
                                         :class="{
                                             'border-red-500':
-                                                form.errors.barang?.[index]
-                                                    ?.satuan,
+                                                form.errors[
+                                                    `barang.${index}.satuan`
+                                                ],
                                         }"
                                     />
                                     <small
@@ -547,35 +652,22 @@ const formatDate = (date) => {
                                             <Button
                                                 variant="outline"
                                                 class="w-full justify-start text-left font-normal"
-                                                :class="{
-                                                    'text-muted-foreground':
-                                                        !item.tgl_expired,
-                                                    'border-red-500':
-                                                        form.errors[
-                                                            `barang.${index}.tgl_expired`
-                                                        ],
-                                                }"
                                             >
                                                 <CalendarIcon
                                                     class="mr-2 h-4 w-4"
                                                 />
                                                 {{
-                                                    item.tgl_expired ||
-                                                    "Pilih tanggal"
+                                                    item.tgl_expired
+                                                        ? `${item.tgl_expired.day}/${item.tgl_expired.month}/${item.tgl_expired.year}`
+                                                        : "Pilih tanggal"
                                                 }}
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent class="w-auto p-0">
                                             <Calendar
                                                 v-model="item.tgl_expired"
-                                                @update:modelValue="
-                                                    (val) =>
-                                                        (item.tgl_expired = val
-                                                            ? format(
-                                                                  val,
-                                                                  'yyyy-MM-dd'
-                                                              )
-                                                            : null)
+                                                :min-value="
+                                                    today(getLocalTimeZone())
                                                 "
                                             />
                                         </PopoverContent>
@@ -639,10 +731,12 @@ const formatDate = (date) => {
                 <Button
                     variant="default"
                     @click="submit"
-                    :disabled="isOverBudget || isSubmitting"
+                    :disabled="isOverBudget || form.processing"
                 >
-                    <span v-if="isSubmitting">Menyimpan...</span>
-                    <span v-else>Simpan (Ctrl+Enter)</span>
+                    <span v-if="form.processing">Menyimpan...</span>
+                    <span v-else
+                        >{{ editing ? "Update" : "Simpan" }} (Ctrl+Enter)</span
+                    >
                 </Button>
             </div>
         </div>

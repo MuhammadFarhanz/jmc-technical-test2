@@ -5,15 +5,21 @@ import Dropdown from "@/Components/Dropdown.vue";
 import DropdownLink from "@/Components/DropdownLink.vue";
 import NavLink from "@/Components/NavLink.vue";
 import ResponsiveNavLink from "@/Components/ResponsiveNavLink.vue";
-import { Link } from "@inertiajs/vue3";
-import SideBar from "@/Components/Dashboard/SideBar.vue";
+import { Link, usePage } from "@inertiajs/vue3";
+import DashboardSidebar from "@/Components/Dashboard/DashboardSidebar.vue";
 
 const showingNavigationDropdown = ref(false);
+
+const { auth } = usePage().props;
+console.log(auth.user);
 </script>
 
 <template>
     <div>
-        <div class="min-h-screen bg-gray-100">
+        <div class="min-h-screen bg-gray-100 flex flex-col">
+            <!-- <DashboardSidebar /> -->
+            <!-- Sidebar -->
+
             <nav class="border-b border-gray-100 bg-white">
                 <!-- Primary Navigation Menu -->
                 <div class="mx-auto px-4 sm:px-6 lg:px-8">
@@ -175,7 +181,7 @@ const showingNavigationDropdown = ref(false);
             </nav>
 
             <!-- Page Heading -->
-            <header class="bg-white shadow" v-if="$slots.header">
+            <header class="shadow bg-black" v-if="$slots.header">
                 <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                     <slot name="header" />
                 </div>
@@ -183,7 +189,82 @@ const showingNavigationDropdown = ref(false);
 
             <!-- Page Content -->
             <main class="flex">
-                <SideBar />
+                <div
+                    class="w-64 bg-slate-900 text-white min-h-screen flex flex-col"
+                >
+                    <div
+                        class="p-6 text-lg font-bold border-b border-slate-700"
+                    >
+                        Aplikasi Pengelolaan Barang
+                    </div>
+                    <Link
+                        href="/dashboard"
+                        class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
+                        :class="{
+                            'bg-slate-700': $page.url.startsWith('/dashboard'),
+                        }"
+                    >
+                        <i class="pi pi-box"></i> <span>Barang Masuk</span>
+                    </Link>
+                    <Link
+                        href="/master-data/kategori"
+                        class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
+                        :class="[
+                            $page.url.startsWith('/manajemen-user')
+                                ? 'bg-slate-700'
+                                : '',
+                            auth.user.role != 'Admin'
+                                ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                                : 'hover:bg-slate-700',
+                        ]"
+                        :aria-disabled="auth.user.role != 'Admin'"
+                    >
+                        <i class="pi pi-box"></i> <span>Kategori</span>
+                    </Link>
+                    <Link
+                        href="/master-data/sub-kategori"
+                        class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
+                        :class="[
+                            $page.url.startsWith('/manajemen-user')
+                                ? 'bg-slate-700'
+                                : '',
+                            auth.user.role != 'Admin'
+                                ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                                : 'hover:bg-slate-700',
+                        ]"
+                        :aria-disabled="auth.user.role != 'Admin'"
+                    >
+                        <i class="pi pi-box"></i> <span>Sub Kategori</span>
+                    </Link>
+                    <!-- <Link
+                        href="/manajemen-user"
+                        class="flex items-center gap-2 py-2 px-4 hover:bg-slate-700 rounded transition-colors mb-2"
+                        :class="{
+                            'bg-slate-700':
+                                $page.url.startsWith('/manajemen-user'),
+                        }"
+                    >
+                        <i class="pi pi-box"></i> <span>Manajemen User</span>
+                    </Link> -->
+
+                    <Link
+                        href="/manajemen-user"
+                        class="flex items-center gap-2 py-2 px-4 rounded transition-colors mb-2"
+                        :class="[
+                            $page.url.startsWith('/manajemen-user')
+                                ? 'bg-slate-700'
+                                : '',
+                            auth.user.role != 'Admin'
+                                ? 'pointer-events-none opacity-50 cursor-not-allowed'
+                                : 'hover:bg-slate-700',
+                        ]"
+                        :aria-disabled="auth.user.role != 'Admin'"
+                    >
+                        <i class="pi pi-box"></i> <span>Manajemen User</span>
+                    </Link>
+                </div>
+
+                <!-- <DashboardSidebar /> -->
                 <slot />
             </main>
         </div>

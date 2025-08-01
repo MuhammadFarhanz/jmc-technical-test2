@@ -30,24 +30,32 @@ import {
     Search,
     Plus,
 } from "lucide-vue-next";
-import AddUserDialog from "../Dialog/AddUserDialog.vue";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { useUser } from "@/composables/useUser";
+import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout.vue";
+import AddUserDialog from "@/Components/Dialog/AddUserDialog.vue";
 
 const search = ref("");
 const selectedRole = ref("");
 const currentPage = ref(1);
 const rowsPerPage = 10;
+const showDialog = ref(false);
 
-const { usersQuery, deleteUser } = useUser();
+defineOptions({
+    layout: AuthenticatedLayout,
+});
 
-const roleOptions = ["Admin", "Operator"];
+const props = defineProps({
+    users: {
+        type: Array,
+        required: true,
+        default: () => [],
+    },
+});
 
-console.log(usersQuery?.data?.value);
 const filteredData = computed(() => {
-    if (!usersQuery.data.value) return [];
+    if (!props.users) return [];
 
-    return usersQuery.data.value.filter((user) => {
+    return props.users.filter((user) => {
         // Safe property access with optional chaining and nullish coalescing
         const username = user.username?.toLowerCase() ?? "";
         const name = user.name?.toLowerCase() ?? "";
@@ -63,6 +71,7 @@ const filteredData = computed(() => {
         return matchSearch && matchRole;
     });
 });
+
 const pagedData = computed(() => {
     const start = (currentPage.value - 1) * rowsPerPage;
     return filteredData.value.slice(start, start + rowsPerPage);
@@ -72,17 +81,32 @@ const totalPages = computed(() => {
     return Math.ceil(filteredData.value.length / rowsPerPage);
 });
 
-const isDialogVisible = ref(false);
+const roleOptions = ["Admin", "Operator"];
 
-const handleDelete = (id) => {
+const handleSuccess = () => {
+    showDialog.value = false;
+    props.users = [...props.users, props.newUser];
+    props.newUser = {
+        id: null,
+        username: "",
+        name: "",
+        email: "",
+        role: "",
+    };
+};
+
+const deleteUser = (id) => {
     if (confirm("Are you sure you want to delete this user?")) {
-        deleteUser.mutate(id);
+        const index = props.users.findIndex((user) => user.id === id);
+        if (index !== -1) {
+            props.users.splice(index, 1);
+        }
     }
 };
 </script>
 
 <template>
-    <div class="p-6 w-5/6">
+    <div class="p-6 w-full">
         <!-- Breadcrumb -->
         <p class="text-sm text-muted-foreground mb-2">HOME / MANAJEMEN USER</p>
 
@@ -91,7 +115,7 @@ const handleDelete = (id) => {
 
         <!-- Header actions -->
         <div class="flex justify-between items-center mb-4">
-            <Dialog v-model:open="isDialogVisible">
+            <Dialog v-model:open="showDialog">
                 <DialogTrigger>
                     <Button variant="default" class="gap-2">
                         <Plus class="h-4 w-4" />
@@ -99,7 +123,11 @@ const handleDelete = (id) => {
                     </Button>
                 </DialogTrigger>
                 <DialogContent>
-                    <AddUserDialog @success="isDialogVisible = false" />
+                    <AddUserDialog
+                        v-model:new-user="props.newUser"
+                        @success="handleSuccess"
+                        @cancel="showDialog = false"
+                    />
                 </DialogContent>
             </Dialog>
             <div class="flex gap-2 items-center">
@@ -108,7 +136,7 @@ const handleDelete = (id) => {
                         {{ "Semua Role" }}
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem :value="''">Semua Role</SelectItem>
+                        <SelectItem :value="null">Semua Role</SelectItem>
                         <SelectItem
                             v-for="role in roleOptions"
                             :key="role"
@@ -145,7 +173,7 @@ const handleDelete = (id) => {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableRow v-for="(user, index) in pagedData" :key="user.no">
+                    <TableRow v-for="(user, index) in pagedData" :key="user.id">
                         <TableCell> {{ index + 1 }}</TableCell>
                         <TableCell>
                             <div class="flex gap-2 justify-center">
@@ -154,6 +182,7 @@ const handleDelete = (id) => {
                                 />
                                 <Trash2
                                     class="h-4 w-4 text-red-600 cursor-pointer"
+                                    @click="deleteUser(user.id)"
                                 />
                                 <Lock
                                     class="h-4 w-4 text-gray-600 cursor-pointer"
@@ -161,7 +190,7 @@ const handleDelete = (id) => {
                             </div>
                         </TableCell>
                         <TableCell>{{ user.username }}</TableCell>
-                        <TableCell>{{ user.nama }}</TableCell>
+                        <TableCell>{{ user.name }}</TableCell>
                         <TableCell>{{ user.email }}</TableCell>
                         <TableCell>{{ user.role }}</TableCell>
                     </TableRow>
@@ -203,3 +232,4 @@ const handleDelete = (id) => {
         </Pagination>
     </div>
 </template>
+

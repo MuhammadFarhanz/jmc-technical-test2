@@ -5,46 +5,46 @@ namespace App\Http\Controllers;
 use App\Models\SubKategori;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Inertia\Inertia;
 
 class SubKategoriController extends Controller
 {
-    // List all subkategori
+
     public function index()
     {
-        $subkategoris = SubKategori::with('kategori')->get();
-        return response()->json($subkategoris);
+        $subkategoris = SubKategori::with('kategori')
+            ->get(); 
+     
+
+
+        return Inertia::render('SubKategori/Index', [
+            'subKategoris' => $subkategoris
+        ]);
     }
 
-    // Store a new subkategori
+
     public function store(Request $request)
     {
         $validated = $request->validate([
             'kategori_id' => 'required|exists:kategori,id',
             'nama_subkategori' => 'required|string|max:100',
-            'batas_harga' => 'nullable|numeric|min:0',
+            'batas_harga' => 'required|numeric|min:1',
         ]);
+
         $subkategori = SubKategori::create($validated);
-        return response()->json($subkategori, 201);
+        return back()->with('success', 'Sub kategori created successfully');
     }
 
-    // Show a single subkategori
-    public function show($id)
+    public function update(Request $request, SubKategori $subkategori)
     {
-        $subkategori = SubKategori::with('kategori')->findOrFail($id);
-        return response()->json($subkategori);
-    }
-
-    // Update a subkategori
-    public function update(Request $request, $id)
-    {
-        $subkategori = SubKategori::findOrFail($id);
         $validated = $request->validate([
             'kategori_id' => 'required|exists:kategori,id',
             'nama_subkategori' => 'required|string|max:100',
             'batas_harga' => 'nullable|numeric|min:0',
         ]);
+
         $subkategori->update($validated);
-        return response()->json($subkategori);
+        return back()->with('success', 'Sub kategori updated successfully');
     }
 
     // Delete a subkategori

@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from "vue";
-import { Dialog } from "@/components/ui/dialog";
+import { useForm, router } from "@inertiajs/vue3";
 import {
     Select,
     SelectTrigger,
@@ -9,125 +9,86 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/composables/useUser";
 import { useToast } from "@/components/ui/toast/use-toast";
 
-// Props
-const visible = defineModel("visible");
 const { toast } = useToast();
-const { createUser } = useUser();
-const emit = defineEmits(["success"]);
-// Options & form
-const roles = ["Admin", "Operator"];
-const form = ref({
-    role: "",
+
+const roles = ref(["Admin", "Operator"]);
+const emit = defineEmits(["success", "cancel"]);
+
+const form = useForm({
+    name: "",
     username: "",
-    password: "",
-    nama: "",
     email: "",
+    password: "",
+    role: roles.value[0],
 });
 
-// Errors
-const errors = ref({
-    role: null,
-    username: null,
-    password: null,
-    nama: null,
-    email: null,
-});
-
-// Validation
 const validateForm = () => {
     let isValid = true;
-    errors.value = {
-        role: null,
-        username: null,
-        password: null,
-        nama: null,
-        email: null,
-    };
+    form.clearErrors();
 
-    if (!form.value.role) {
-        errors.value.role = "Role is required";
+    if (!form.name) {
+        form.setError("name", "Name is required");
         isValid = false;
     }
 
-    if (!form.value.username) {
-        errors.value.username = "Username is required";
+    if (!form.username) {
+        form.setError("username", "Username is required");
         isValid = false;
-    } else if (form.value.username.length < 3) {
-        errors.value.username = "Username must be at least 3 characters";
-        isValid = false;
-    }
-
-    if (!form.value.password) {
-        errors.value.password = "Password is required";
-        isValid = false;
-    } else if (form.value.password.length < 8) {
-        errors.value.password = "Password must be at least 8 characters";
+    } else if (form.username.length < 8) {
+        form.setError("username", "Username must be at least 8 characters");
         isValid = false;
     }
 
-    if (!form.value.nama) {
-        errors.value.nama = "Name is required";
+    if (!form.email) {
+        form.setError("email", "Email is required");
+        isValid = false;
+    } else if (!/^\S+@\S+\.\S+$/.test(form.email)) {
+        form.setError("email", "Email is invalid");
         isValid = false;
     }
 
-    if (!form.value.email) {
-        errors.value.email = "Email is required";
+    if (!form.password) {
+        form.setError("password", "Password is required");
         isValid = false;
-    } else if (!/^\S+@\S+\.\S+$/.test(form.value.email)) {
-        errors.value.email = "Email is invalid";
+    } else if (form.password.length < 8) {
+        form.setError("password", "Password must be at least 8 characters");
+        isValid = false;
+    }
+
+    if (!form.role) {
+        form.setError("role", "Role is required");
         isValid = false;
     }
 
     return isValid;
 };
 
-// Submission
-const handleSubmit = async () => {
+const handleSubmit = () => {
     if (!validateForm()) return;
 
-    try {
-        await createUser.mutateAsync({
-            name: form.value.nama,
-            username: form.value.username,
-            email: form.value.email,
-            password: form.value.password,
-            role: form.value.role,
-        });
-
-        toast({
-            title: "Success",
-            description: "User created successfully",
-            variant: "success",
-        });
-
-        // Reset form
-        form.value = {
-            role: "",
-            username: "",
-            password: "",
-            nama: "",
-            email: "",
-        };
-
-        emit("success");
-    } catch (error) {
-        toast({
-            title: "Error",
-            description: error.message || "Failed to create user",
-            variant: "destructive",
-        });
-    }
+    form.post(route("users.store"), {
+        preserveScroll: true,
+        onSuccess: () => {
+            toast({
+                title: "Success",
+                description: "User created successfully",
+            });
+            form.reset();
+            emit("success");
+            router.reload({ only: ["users"] });
+        },
+        onError: () => {
+            toast({
+                title: "Error",
+                description: "Failed to create user",
+                variant: "destructive",
+            });
+        },
+    });
 };
 </script>
-
-<style scoped>
-.text-red-500 {
-    color: #f44336;
-}
-</style>
 
 <template>
     <div class="max-w-lg w-full rounded-xl">
@@ -139,12 +100,15 @@ const handleSubmit = async () => {
                 >
                 <Select
                     v-model="form.role"
-                    :class="{ 'border-red-500': errors.role }"
+                    :class="{ 'border-red-500': form.errors.role }"
                 >
                     <SelectTrigger class="w-full border">
-                        {{ form.role || "Pilih Role" }}
+                        {{ form.role || "Select Role" }}
                     </SelectTrigger>
                     <SelectContent>
+                        <SelectItem value="unassign">Unassign</SelectItem>
+
+                        <!-- Errror bikim rusak di selectimen value -->
                         <SelectItem
                             v-for="role in roles"
                             :key="role"
@@ -154,9 +118,9 @@ const handleSubmit = async () => {
                         </SelectItem>
                     </SelectContent>
                 </Select>
-                <small v-if="errors.role" class="text-red-500">{{
-                    errors.role
-                }}</small>
+                <small v-if="form.errors.role" class="text-red-500">
+                    {{ form.errors.role }}
+                </small>
             </div>
 
             <!-- Username -->
@@ -168,11 +132,11 @@ const handleSubmit = async () => {
                     id="username"
                     v-model="form.username"
                     class="w-full"
-                    :class="{ 'border-red-500': errors.username }"
+                    :class="{ 'border-red-500': form.errors.username }"
                 />
-                <small v-if="errors.username" class="text-red-500">{{
-                    errors.username
-                }}</small>
+                <small v-if="form.errors.username" class="text-red-500">
+                    {{ form.errors.username }}
+                </small>
             </div>
 
             <!-- Password -->
@@ -185,29 +149,28 @@ const handleSubmit = async () => {
                     v-model="form.password"
                     type="password"
                     class="w-full"
-                    :class="{ 'border-red-500': errors.password }"
+                    :class="{ 'border-red-500': form.errors.password }"
                 />
-                <small v-if="errors.password" class="text-red-500">{{
-                    errors.password
-                }}</small>
+                <small v-if="form.errors.password" class="text-red-500">
+                    {{ form.errors.password }}
+                </small>
             </div>
 
-            <!-- Nama -->
+            <!-- Name -->
             <div class="flex flex-col gap-1">
-                <label for="nama"
-                    >Nama <span class="text-red-500">*</span></label
+                <label for="name"
+                    >Name <span class="text-red-500">*</span></label
                 >
                 <Input
-                    id="nama"
-                    v-model="form.nama"
+                    id="name"
+                    v-model="form.name"
                     class="w-full"
-                    :class="{ 'border-red-500': errors.nama }"
+                    :class="{ 'border-red-500': form.errors.name }"
                 />
-                <small v-if="errors.nama" class="text-red-500">{{
-                    errors.nama
-                }}</small>
+                <small v-if="form.errors.name" class="text-red-500">
+                    {{ form.errors.name }}
+                </small>
             </div>
-
             <!-- Email -->
             <div class="flex flex-col gap-1">
                 <label for="email"
@@ -216,12 +179,13 @@ const handleSubmit = async () => {
                 <Input
                     id="email"
                     v-model="form.email"
+                    type="email"
                     class="w-full"
-                    :class="{ 'border-red-500': errors.email }"
+                    :class="{ 'border-red-500': form.errors.email }"
                 />
-                <small v-if="errors.email" class="text-red-500">{{
-                    errors.email
-                }}</small>
+                <small v-if="form.errors.email" class="text-red-500">
+                    {{ form.errors.email }}
+                </small>
             </div>
 
             <!-- Buttons -->
@@ -229,17 +193,17 @@ const handleSubmit = async () => {
                 <Button
                     variant="outline"
                     type="button"
-                    @click="visible = false"
-                    :disabled="createUser.isLoading"
+                    @click="$emit('cancel')"
+                    :disabled="form.processing"
                 >
                     Close
                 </Button>
                 <Button
                     variant="default"
                     type="submit"
-                    :disabled="createUser.isLoading"
+                    :disabled="form.processing"
                 >
-                    <span v-if="createUser.isLoading">Creating...</span>
+                    <span v-if="form.processing">Creating...</span>
                     <span v-else>Submit</span>
                 </Button>
             </div>

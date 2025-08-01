@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Inertia\Inertia;
 
 class UserController extends Controller
 {
@@ -15,7 +16,9 @@ class UserController extends Controller
     public function index()
     {
         $users = User::all();
-        return response()->json($users);
+        return Inertia::render('ManajemenUser/Index', [
+            'users' => $users
+        ]);
     }
 
     /**
@@ -28,20 +31,23 @@ class UserController extends Controller
 
     /**
      * Store a newly created resource in storage.
-     */
+    //  */
+
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'username' => 'nullable|string|max:100|unique:users,username',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
-            'role' => 'required|in:Admin,Operator',
-        ]);
-        $validated['password'] = Hash::make($validated['password']);
-        $user = User::create($validated);
-        return response()->json($user, 201);
-    }
+{
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'username' => 'nullable|string|min:8|max:100|unique:users,username',
+        'email' => 'required|email|unique:users,email',
+        'password' => 'required|string|min:8|max:100',
+        'role' => 'required|in:Admin,Operator',
+    ]);
+    
+    $validated['password'] = Hash::make($validated['password']);
+    $user = User::create($validated);
+    
+    return redirect()->back()->with('success', 'User created successfully');
+}
 
     /**
      * Display the specified resource.
